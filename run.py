@@ -83,8 +83,9 @@ def save(msg: str):
     because the dump holds business emails and reply text."""
     backup()
     private = bool(lib.load_yaml("sources.yaml").get("git", {}).get("private_confirmed"))
-    excl = [] if private else [":!data/backup", ":!reports", ":!data/raw", ":!data/loads"]
-    git("add", "-A", "--", ".", *excl)
+    git("add", "-A", "--", ".")
+    if private:  # these paths are gitignored so a public remote can never receive them by accident
+        git("add", "-f", "--", "data/backup", "data/raw", "data/loads", "reports")
     r = git("commit", "-m", msg)
     out = (r.stdout or r.stderr).strip()
     print(out.splitlines()[0] if out else "nothing to commit")
