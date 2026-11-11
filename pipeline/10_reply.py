@@ -2,17 +2,17 @@
 """Step 10 - Reply handling. Classify each human reply into ONE intent with plain rules and act on it.
 Only four approved templates are ever sent, word for word; anything unclear goes to the review queue unsent.
 
-  10_reply.py            classify new replies, suppress stop / not-interested, list what would be sent
-  10_reply.py --send     also send approved templates through the Instantly API (INSTANTLY_API_KEY)
-Templates live in config/reply_templates/*.md and are inert until their front matter says approved: true."""
+  10_reply.py                  classify new replies, suppress stop / not-interested, write reports/replies_to_send.json
+  10_reply.py mark-sent <id>.. record replies the agent answered (via the Instantly reply_to_email connector tool)
+Templates live in config/reply_templates/*.md and are inert until their front matter says approved: true.
+Each item in replies_to_send.json maps 1:1 to reply_to_email(reply_to_uuid, eaccount, subject, to, body_text)."""
 import argparse
 import csv
-import os
+import json
 import re
 import sys
 from pathlib import Path
 
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
@@ -53,21 +53,14 @@ def load_template(name: str):
     return m.group(2).strip()
 
 
-def send(key: str, reply_row, body: str):
-    r = requests.post("https://api.instantly.ai/api/v2/emails/reply", headers={"Authorization": f"Bearer {key}"}, timeout=60,
-                      json={"reply_to_uuid": reply_row["instantly_email_id"], "eaccount": reply_row["eaccount"],
-                            "subject": "Re: " + (reply_row["subject"] or ""), "body": {"text": body}})
-    r.raise_for_status()
-
-
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--send", action="store_true")
-    a = ap.parse_args()
     conn = lib.connect()
-    key = os.environ.get("INSTANTLY_API_KEY")
-    if a.send and not key:
-        sys.exit("INSTANTLY_API_KEY not set")
+    if len(sys.argv) > 2 and sys.argv[1] == "mark-sent":
+        for rid in sys.argv[2:]:
+            conn.execute("UPDATE replies SET template_sent=intent, handled_at=? WHERE id=? AND template_sent IS NULL", (lib.now(), int(rid)))
+        conn.commit()
+        print(f"marked {len(sys.argv) - 2} replies as answered")
+        return
     with lib.run(conn, "10_reply") as r:
         rows = conn.execute("SELECT * FROM replies WHERE intent IS NULL ORDER BY id").fetchall()
         r.n_in = len(rows)
@@ -78,29 +71,27 @@ def main():
         spec = importlib.util.spec_from_file_location("sup", Path(__file__).with_name("06_suppress.py"))
         sup = importlib.util.module_from_spec(spec); spec.loader.exec_module(sup)
         sup.rebuild(conn)
-        ready = 0
-        for rp in conn.execute("SELECT * FROM replies WHERE template_sent IS NULL AND handled_at IS NULL AND intent IN ('yes','free','how_it_works','signed_up_cannot_find')").fetchall():
+        out_items = []
+        for rp in conn.execute("SELECT * FROM replies WHERE template_sent IS NULL AND handled_at IS NULL AND is_auto=0 "
+                               "AND intent IN ('yes','free','how_it_works','signed_up_cannot_find')").fetchall():
             body = load_template(TEMPLATE_FOR[rp["intent"]])
-            if not body:
-                continue  # template not approved yet -> stays unsent, visible in the count below
-            ready += 1
-            if a.send:
-                send(key, rp, body)
-                conn.execute("UPDATE replies SET template_sent=?, handled_at=? WHERE id=?", (TEMPLATE_FOR[rp["intent"]], lib.now(), rp["id"]))
+            if body:  # unapproved template -> nothing is queued
+                out_items.append({"reply_id": rp["id"], "reply_to_uuid": rp["instantly_email_id"], "eaccount": rp["eaccount"],
+                                  "subject": "Re: " + re.sub(r"^(re:\s*)+", "", rp["subject"] or "", flags=re.I),
+                                  "to": rp["from_email"], "body_text": body, "intent": rp["intent"]})
+        (lib.ROOT / "reports" / "replies_to_send.json").write_text(json.dumps(out_items, indent=1, ensure_ascii=False))
         conn.execute("UPDATE replies SET handled_at=? WHERE handled_at IS NULL AND intent IN ('auto','stop','not_interested')", (lib.now(),))
         conn.commit()
-        # review queue: 'other' plus 'signed up, cannot find' (flagged per plan 4.5)
         q = conn.execute("SELECT r.id, r.received_at, r.from_email, b.name, r.intent, substr(r.text,1,300) text FROM replies r "
                          "LEFT JOIN businesses b ON b.id=r.business_id WHERE r.intent IN ('other','signed_up_cannot_find') AND r.handled_at IS NULL "
                          "ORDER BY r.received_at").fetchall()
-        out = lib.ROOT / "reports" / "review_queue.csv"
-        with out.open("w", newline="") as f:
+        with (lib.ROOT / "reports" / "review_queue.csv").open("w", newline="") as f:
             w = csv.writer(f); w.writerow(["id", "received", "from", "business", "intent", "text"])
             w.writerows([list(x) for x in q])
         r.n_out = len(rows)
         by = conn.execute("SELECT intent, COUNT(*) n FROM replies GROUP BY intent").fetchall()
         print("replies by intent:", {x["intent"]: x["n"] for x in by})
-        print(f"review queue: {len(q)} (reports/review_queue.csv); approved templates ready/sent: {ready}")
+        print(f"review queue: {len(q)} (reports/review_queue.csv); approved-template replies to send: {len(out_items)} (reports/replies_to_send.json)")
 
 
 if __name__ == "__main__":

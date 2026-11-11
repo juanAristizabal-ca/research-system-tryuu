@@ -1,80 +1,99 @@
 #!/usr/bin/env python3
-"""Step 5 - Verify the chosen email of Tier A/B businesses only (verification is the scarce resource).
-Reacher (self-hosted, needs outbound port 25, REACHER_URL) first; Instantly verification (INSTANTLY_API_KEY)
-for what Reacher cannot decide. Only valid addresses load; catch-all domains cap the business at Tier B."""
-import os
-import sys
-import time
-from pathlib import Path
+"""Step 5 - Verify the chosen email of Tier A/B businesses only.
 
-import requests
+Levels: valid / catch_all (verified by Instantly) > mx_only (free DNS-over-HTTPS check: the domain can receive mail)
+> invalid. Outbound port 25 is blocked in this environment, so there is no SMTP check; Instantly's verifier
+(0.25 credit per address, used through the connector by the agent) is the only real one.
+`verify.min_level` in config/sources.yaml decides what may load: 'valid' (plan default) or 'mx_only'.
+
+  05_verify.py mx [--limit N]                 free MX check, marks mx_only / invalid
+  05_verify.py todo <out.json> [--limit N]    addresses worth spending an Instantly credit on, best Tier first
+  05_verify.py ingest <results.json>          list of verify_email answers: {email, verification_status, catch_all}
+  05_verify.py settle                         promote / demote businesses by the configured level (also run by the above)
+Catch-all domains cap the business at Tier B."""
+import argparse
+import json
+import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
 
-INSTANTLY = "https://api.instantly.ai/api/v2"
+LEVELS = {"valid": 3, "catch_all": 3, "mx_only": 1}
 
 
-def reacher(email: str) -> str | None:
-    url = os.environ.get("REACHER_URL")
-    if not url:
-        return None
-    try:
-        r = requests.post(url.rstrip("/") + "/v0/check_email", json={"to_email": email}, timeout=60)
-        j = r.json()
-    except (requests.RequestException, ValueError):
-        return None
-    if j.get("smtp", {}).get("is_catch_all"):
-        return "catch_all"
-    return {"safe": "valid", "risky": "risky", "invalid": "invalid"}.get(j.get("is_reachable"))  # 'unknown' -> None
+def settle(conn) -> tuple[int, int]:
+    need = 1 if lib.load_yaml("sources.yaml")["verify"]["min_level"] == "mx_only" else 3
+    up = down = 0
+    rows = conn.execute("SELECT c.verification v, b.id bid, b.status, s.tier FROM contacts c JOIN businesses b ON b.id=c.business_id "
+                        "JOIN scores s ON s.business_id=b.id WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','verified','enriched')").fetchall()
+    for r in rows:
+        ok = LEVELS.get(r["v"], 0) >= need
+        if ok and r["status"] != "verified":
+            lib.set_status(conn, r["bid"], "verified"); up += 1
+        elif not ok and r["status"] == "verified":
+            lib.set_status(conn, r["bid"], "scored"); down += 1
+        elif r["v"] == "invalid" and r["status"] == "scored":
+            lib.set_status(conn, r["bid"], "enriched")  # needs a different mailbox
+        if r["v"] == "catch_all" and r["tier"] == "A":
+            conn.execute("UPDATE scores SET tier='B' WHERE business_id=?", (r["bid"],))
+    conn.commit()
+    return up, down
 
 
-def instantly(email: str) -> str | None:
-    key = os.environ.get("INSTANTLY_API_KEY")
-    if not key:
-        return None
-    h = {"Authorization": f"Bearer {key}"}
-    try:
-        j = requests.post(f"{INSTANTLY}/email-verification", json={"email": email}, headers=h, timeout=60).json()
-        for _ in range(10):
-            if j.get("verification_status") != "pending":
-                break
-            time.sleep(3)
-            j = requests.get(f"{INSTANTLY}/email-verification/{email}", headers=h, timeout=60).json()
-    except (requests.RequestException, ValueError):
-        return None
-    st = j.get("verification_status")
-    if st == "verified":
-        return "catch_all" if j.get("catch_all") else "valid"
-    return {"invalid": "invalid"}.get(st)
+def cmd_mx(conn, a):
+    with lib.run(conn, "05_verify:mx") as r:
+        rows = conn.execute("SELECT c.id cid, c.email FROM contacts c JOIN businesses b ON b.id=c.business_id JOIN scores s ON s.business_id=b.id "
+                            "WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','enriched') AND c.verification IS NULL"
+                            + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
+        r.n_in = len(rows)
+        for row in rows:
+            res = lib.mx_ok(lib.email_domain(row["email"]))
+            if res is None:
+                r.errors.append(f"{row['email']}: DNS undecided"); continue
+            conn.execute("UPDATE contacts SET verification=?, verified_at=? WHERE id=?", ("mx_only" if res else "invalid", lib.now(), row["cid"]))
+            r.n_out += 1
+        conn.commit()
+        print("settle:", settle(conn))
+
+
+def cmd_todo(conn, a):
+    rows = conn.execute("SELECT c.email, b.name, s.tier, s.score FROM contacts c JOIN businesses b ON b.id=c.business_id JOIN scores s ON s.business_id=b.id "
+                        "WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','verified') "
+                        "AND (c.verification IS NULL OR c.verification='mx_only') ORDER BY s.tier, s.score DESC"
+                        + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
+    Path(a.file).write_text(json.dumps([{"email": r["email"], "name": r["name"], "tier": r["tier"]} for r in rows], indent=1))
+    print(f"{len(rows)} addresses written to {a.file} (each costs 0.25 Instantly credit)")
+
+
+def cmd_ingest(conn, a):
+    with lib.run(conn, "05_verify:ingest") as r:
+        items = json.loads(Path(a.file).read_text())
+        r.n_in = len(items)
+        for it in items:
+            st = it.get("verification_status")
+            res = "catch_all" if st == "verified" and it.get("catch_all") else "valid" if st == "verified" else "invalid" if st == "invalid" else None
+            if res is None:
+                r.errors.append(f"{it.get('email')}: status {st}"); continue
+            conn.execute("UPDATE contacts SET verification=?, verified_at=? WHERE email=? AND is_chosen=1", (res, lib.now(), lib.norm_email(it["email"])))
+            r.n_out += 1
+        conn.commit()
+        print("settle:", settle(conn))
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    m = sub.add_parser("mx"); m.add_argument("--limit", type=int)
+    t = sub.add_parser("todo"); t.add_argument("file"); t.add_argument("--limit", type=int)
+    i = sub.add_parser("ingest"); i.add_argument("file")
+    sub.add_parser("settle")
+    a = ap.parse_args()
     conn = lib.connect()
-    if not (os.environ.get("REACHER_URL") or os.environ.get("INSTANTLY_API_KEY")):
-        sys.exit("Set REACHER_URL and/or INSTANTLY_API_KEY: nothing can be verified without one (and unverified emails never load).")
-    max_age = lib.load_yaml("sources.yaml")["verify"]["max_age_days"]
-    with lib.run(conn, "05_verify") as r:
-        rows = conn.execute(
-            "SELECT c.id cid, c.email, c.verification, c.verified_at, b.id bid, b.status, s.tier FROM contacts c "
-            "JOIN businesses b ON b.id=c.business_id JOIN scores s ON s.business_id=b.id "
-            "WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','verified')").fetchall()
-        r.n_in = len(rows)
-        for row in rows:
-            fresh = row["verified_at"] and (lib.parse_ts(lib.now()) - lib.parse_ts(row["verified_at"])).days < max_age
-            res = row["verification"] if fresh else (reacher(row["email"]) or instantly(row["email"]))
-            if res is None:
-                r.errors.append(f"{row['email']}: undecided")
-                continue
-            conn.execute("UPDATE contacts SET verification=?, verified_at=? WHERE id=?", (res, lib.now(), row["cid"]))
-            if res in ("valid", "catch_all"):
-                lib.set_status(conn, row["bid"], "verified")
-                if res == "catch_all" and row["tier"] == "A":
-                    conn.execute("UPDATE scores SET tier='B' WHERE business_id=?", (row["bid"],))
-                r.n_out += 1
-            else:
-                lib.set_status(conn, row["bid"], "enriched")  # needs a different mailbox
-            conn.commit()
+    if a.cmd == "settle":
+        print("settle:", settle(conn))
+    else:
+        {"mx": cmd_mx, "todo": cmd_todo, "ingest": cmd_ingest}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

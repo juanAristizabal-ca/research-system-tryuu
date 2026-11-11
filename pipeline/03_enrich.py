@@ -2,14 +2,12 @@
 """Step 3 - Enrich = crawl the business's own site, then extract facts with a fixed prompt.
 
   03_enrich.py crawl   [--limit N] [--recrawl]   polite crawl (robots respected, 1 req/s per host)
-  03_enrich.py extract [--limit N]               enqueue LLM tasks, run them if ANTHROPIC_API_KEY is set,
-                                                 apply any finished answers (otherwise: llm.py export/import)
+  03_enrich.py extract [--limit N]               screen, queue tasks for the agent, apply answers already imported
 Pass rules: the business name must appear on the site; every extracted field needs a verbatim quote that
 is really in the fetched text, otherwise the field stays empty (plan 5.3 steps 3-4).
 """
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -23,7 +21,6 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
-import llm  # noqa: E402
 
 
 # ------------------------------------------------------------------ crawl
@@ -174,20 +171,30 @@ def cmd_crawl(conn, a):
 
 
 # ------------------------------------------------------------------ extract
-def build_prompt(conn, bid: int, segments: list[str], cap: int) -> str | None:
+def build_prompt(conn, bid: int, cap: int) -> str | None:
+    """Per-business body only; the fixed instructions are added once per worksheet (llm.py)."""
     pages = conn.execute("SELECT url, text FROM pages WHERE business_id=? AND text IS NOT NULL ORDER BY id", (bid,)).fetchall()
     if not pages:
         return None
+    texts = lib.dedupe_pages([p["text"] for p in pages])
     body, used = [], 0
-    for p in pages:
-        chunk = f"[[URL: {p['url']}]]\n{p['text']}"
+    for p, t in zip(pages, texts):
+        chunk = f"[[URL: {p['url']}]]\n{t}"
         body.append(chunk[: max(0, cap - used)])
         used += len(chunk)
         if used >= cap:
             break
     biz = conn.execute("SELECT name, city FROM businesses WHERE id=?", (bid,)).fetchone()
-    head = (lib.CONFIG / "extraction_prompt.md").read_text().replace("{segments}", ", ".join(segments))
-    return f"{head}\n\nBusiness: {biz['name']} ({biz['city'] or 'unknown city'})\n\n" + "\n\n".join(body)
+    return f"Business: {biz['name']} ({biz['city'] or 'unknown city'})\n" + "\n".join(body)
+
+
+def skip_reason(conn, b, seed: dict, cities: set) -> str | None:
+    """Cheap code-level screen so the agent never spends effort on a lead that cannot load."""
+    if b["city"] and b["city"].lower() not in cities:
+        return "outside launch cities"
+    cands = [r["email"] for r in conn.execute("SELECT email FROM contacts WHERE business_id=?", (b["id"],))]
+    email, _, _ = lib.choose_mailbox(cands, b["domain"] or "", seed)
+    return None if email else "no usable mailbox on site"
 
 
 def apply_extraction(conn, bid: int, data: dict) -> dict:
@@ -248,34 +255,40 @@ def apply_extraction(conn, bid: int, data: dict) -> dict:
 
 
 def cmd_extract(conn, a):
-    segs = list(lib.load_yaml("segments.yaml")["segments"])
     cap = lib.load_yaml("sources.yaml")["llm"]["max_chars_per_business"]
+    seed, cities = lib.load_yaml("suppression_seed.yaml"), lib.city_set()
     with lib.run(conn, "03_enrich:extract") as r:
         todo = conn.execute(
-            "SELECT id FROM businesses WHERE status='discovered' AND id IN (SELECT business_id FROM pages WHERE text IS NOT NULL) "
-            "AND id NOT IN (SELECT business_id FROM llm_tasks WHERE kind='extract') ORDER BY id" + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
+            "SELECT * FROM businesses WHERE status='discovered' AND id IN (SELECT business_id FROM pages WHERE text IS NOT NULL) "
+            "AND id NOT IN (SELECT business_id FROM llm_tasks WHERE kind='extract') "
+            "AND id NOT IN (SELECT business_id FROM evidence WHERE field='skip_reason') ORDER BY id"
+            + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
         r.n_in = len(todo)
-        for row in todo:
-            p = build_prompt(conn, row["id"], segs, cap)
-            if p:
-                lib.enqueue_llm(conn, "extract", row["id"], p)
+        skipped = queued = 0
+        for b in todo:
+            why = skip_reason(conn, b, seed, cities)
+            if why:
+                conn.execute("INSERT OR REPLACE INTO evidence(business_id, field, value) VALUES (?,?,?)", (b["id"], "skip_reason", why))
+                skipped += 1
+                continue
+            p = build_prompt(conn, b["id"], cap)
+            if p and lib.enqueue_llm(conn, "extract", b["id"], p):
+                queued += 1
         conn.commit()
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            llm.process(conn, ["extract"])
-        # apply every finished, not-yet-applied task
+        # apply every finished, not-yet-applied answer
         done = conn.execute("SELECT t.business_id FROM llm_tasks t JOIN businesses b ON b.id=t.business_id "
                             "WHERE t.kind='extract' AND t.status='done' AND b.status='discovered'").fetchall()
         for row in done:
             data = lib.get_llm_response(conn, "extract", row["business_id"])
             if data is None:
-                r.errors.append(f"business {row['business_id']}: unparseable LLM answer")
+                r.errors.append(f"business {row['business_id']}: unparseable answer")
                 continue
             apply_extraction(conn, row["business_id"], data)
             r.n_out += 1
         conn.commit()
         pend = conn.execute("SELECT COUNT(*) FROM llm_tasks WHERE kind='extract' AND status='pending'").fetchone()[0]
-        if pend:
-            print(f"{pend} extract tasks pending. Set ANTHROPIC_API_KEY and run llm.py run, or use llm.py export/import.")
+        print(f"queued {queued}, skipped {skipped} (no mailbox / outside launch cities), applied {r.n_out}; {pend} pending for the agent "
+              f"(llm.py export <file> --kind extract, answer, llm.py import <answers>, re-run extract)")
 
 
 def main():

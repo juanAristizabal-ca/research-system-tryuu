@@ -16,10 +16,13 @@ discover:
   licences: {enabled: true}                    # municipal open-data CSVs, ingested with: 01_discover.py licences <csv>
   directories: {enabled: false}                # only where robots/terms allow; enable per directory deliberately
 verify:
-  prefer: reacher                  # reacher | instantly ; Reacher needs outbound port 25 and REACHER_URL
-  max_age_days: 14
+  min_level: valid                 # valid = verified by Instantly (strict, plan default) | mx_only = free DNS check only
+  max_age_days: 14                 # outbound port 25 is blocked here, so SMTP checks are not possible; Instantly credits are scarce
 google_places: {enabled: false, hard_quota_per_month: 4000}
 offlimits: [yelp.com, yellowpages.ca, cylex.ca, showmelocal.com, classpass.com, mapquest.com, foursquare.com]
 load:
   max_batch: 200          # pilot size per segment; raise only after a gate is met
   min_precision: 0.90     # research precision required before loading (plan 9.2 rule 5)
+git:
+  remote: https://github.com/juanAristizabal-ca/research-system-tryuu
+  private_confirmed: false   # flip to true ONLY after the repository is private: the dump holds business emails and replies

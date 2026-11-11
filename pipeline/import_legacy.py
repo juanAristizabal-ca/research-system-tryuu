@@ -3,6 +3,8 @@
 
   import_legacy.py master  <values.json>    Master tab as {"values": [[...]]} (Sheets API output)
   import_legacy.py instantly <leads.csv>    Instantly leads export: gives campaign, status and last-contact dates
+  import_legacy.py instantly-json <page.json> ... [--campaigns <list_campaigns.json> ...]
+                                            pages saved by the Instantly connector (list_leads); names from list_campaigns
   import_legacy.py csv <file.csv> [...]     any old research CSV (Email, Business_Name, City, Website, ...)
 Onboarded list: use 11_match.py <file>. Run 06_suppress.py afterwards to rebuild suppression."""
 import csv
@@ -137,6 +139,49 @@ def do_instantly(path: Path):
     return stats
 
 
+def do_instantly_json(path: Path, names: dict):
+    """list_leads connector pages. Status: 1 active, 2 paused, 3 completed, -1 bounced, -2 unsubscribed, -3 skipped."""
+    j = json.loads(path.read_text())
+    items = j["items"] if isinstance(j, dict) else j
+    stats = {"rows": 0, "bounced": 0, "unsubscribed": 0, "replied": 0}
+    for it in items:
+        stats["rows"] += 1
+        email = lib.norm_email(it.get("email"))
+        pl = it.get("payload") or {}
+        name = pl.get("Business_Name") or pl.get("company_name") or it.get("company_name") or it.get("first_name") or email.split("@")[0]
+        bid = upsert(conn, email, name, pl.get("City", ""), it.get("website") or it.get("company_domain") or "", "instantly")
+        if bid is None:
+            continue
+        camp = names.get(it.get("campaign"), it.get("campaign"))
+        ts = lib.parse_ts(it.get("timestamp_last_contact") or "")
+        st = it.get("status")
+        legacy_send(conn, bid, email, camp, ts.strftime("%Y-%m-%d %H:%M:%S") if ts else None, int(st == -1))
+        if st == -1:
+            supp(conn, "email", email, "bounced (Instantly)"); stats["bounced"] += 1
+        elif st == -2:
+            supp(conn, "email", email, "unsubscribed (Instantly)")
+            d = lib.email_domain(email)
+            if not lib.is_free_mail(d):
+                supp(conn, "domain", d, "unsubscribed (Instantly)")
+            stats["unsubscribed"] += 1
+        cur = conn.execute("SELECT status FROM businesses WHERE id=?", (bid,)).fetchone()["status"]
+        if (it.get("email_reply_count") or 0) > 0 and cur in ("discovered", "enriched", "sent", "loaded"):
+            lib.set_status(conn, bid, "replied"); stats["replied"] += 1
+        elif it.get("timestamp_last_contact") and cur in ("discovered", "enriched"):
+            lib.set_status(conn, bid, "sent")
+    conn.commit()
+    return stats
+
+
+def campaign_names(files: list) -> dict:
+    out = {}
+    for f in files:
+        j = json.loads(Path(f).read_text())
+        for c in (j["items"] if isinstance(j, dict) else j):
+            out[c["id"]] = c["name"]
+    return out
+
+
 def do_csv(path: Path):
     archive(path)
     n = 0
@@ -150,12 +195,18 @@ def do_csv(path: Path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or sys.argv[1] not in ("master", "instantly", "csv"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("master", "instantly", "instantly-json", "csv"):
         sys.exit(__doc__)
     conn = lib.connect()
+    args, names = sys.argv[2:], {}
+    if "--campaigns" in args:
+        i = args.index("--campaigns")
+        names = campaign_names(args[i + 1:])
+        args = args[:i]
+    fn = {"master": do_master, "instantly": do_instantly, "csv": do_csv,
+          "instantly-json": lambda x: do_instantly_json(x, names)}[sys.argv[1]]
     with lib.run(conn, f"import_legacy:{sys.argv[1]}") as r:
-        for p in sys.argv[2:]:
-            res = {"master": do_master, "instantly": do_instantly, "csv": do_csv}[sys.argv[1]](Path(p))
-            print(p, res)
+        for p in args:
+            print(p, fn(Path(p)))
             r.n_in += 1
         r.n_out = conn.execute("SELECT COUNT(*) FROM businesses").fetchone()[0]

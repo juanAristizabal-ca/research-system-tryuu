@@ -3,20 +3,18 @@
 
   08_load.py --segment classes_studios --tier A --size 200 --copy-version v1 --campaign-id <uuid>
         dry run: shows the selection and writes data/loads/<batch>.json (nothing recorded)
-  ... --push     push through the Instantly API (INSTANTLY_API_KEY) and record the batch
-  ... --record   record the batch only (use after pushing the JSON through the Instantly MCP tools)
+  ... --record   after the agent pushed data/loads/<batch>.leads.json with the Instantly connector
+                 (add_leads_to_campaign_or_list_bulk, skip_if_in_workspace), record the batch and flip statuses
 Refuses to load when research precision is under the configured minimum, or --size exceeds max_batch."""
 import argparse
 import hashlib
 import html
 import json
-import os
 import re
 import sys
 import datetime as dt
 from pathlib import Path
 
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
@@ -82,7 +80,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--segment", required=True); ap.add_argument("--tier", required=True, choices=["A", "B"])
     ap.add_argument("--size", type=int, required=True); ap.add_argument("--copy-version", required=True)
-    ap.add_argument("--campaign-id"); ap.add_argument("--push", action="store_true"); ap.add_argument("--record", action="store_true")
+    ap.add_argument("--campaign-id"); ap.add_argument("--record", action="store_true")
     ap.add_argument("--force", action="store_true", help="ignore the precision gate (document why in the change log)")
     a = ap.parse_args()
 
@@ -105,23 +103,18 @@ def main():
     payload = {"batch": name, "campaign_id": a.campaign_id, "skip_if_in_workspace": True, "verify_leads_on_import": False,
                "leads": leads, "business_ids": [b["id"] for b in rows]}
     (out / f"{name}.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False))
+    slim = [{**l, "custom_variables": {k: v for k, v in l["custom_variables"].items() if v}} for l in leads]
+    (out / f"{name}.leads.json").write_text(json.dumps(slim, ensure_ascii=False))  # exactly what the connector gets
     print(f"batch {name}: selected {len(rows)} of {a.size} requested (precision {prec:.0%}); file data/loads/{name}.json")
-    if not (a.push or a.record):
+    if not a.record:
         print("dry run: nothing recorded, nothing pushed")
         return
     if not rows:
         sys.exit("nothing to load")
     if not a.campaign_id:
-        sys.exit("--campaign-id is required to push or record")
+        sys.exit("--campaign-id is required to record")
     with lib.run(conn, "08_load") as r:
         r.n_in = len(rows)
-        if a.push:
-            key = os.environ.get("INSTANTLY_API_KEY") or sys.exit("INSTANTLY_API_KEY not set")
-            for i in range(0, len(leads), 100):
-                resp = requests.post("https://api.instantly.ai/api/v2/leads/add", headers={"Authorization": f"Bearer {key}"},
-                                     json={"campaign_id": a.campaign_id, "skip_if_in_workspace": True,
-                                           "leads": [{k: v for k, v in l.items()} for l in leads[i:i + 100]]}, timeout=120)
-                resp.raise_for_status()
         cur = conn.execute("INSERT INTO batches(name, segment, tier, copy_version, scoring_version, instantly_campaign_id, n_loaded, research_precision) "
                            "VALUES (?,?,?,?,?,?,?,?)", (name, a.segment, a.tier, a.copy_version, scoring_v, a.campaign_id, len(rows), prec))
         for b, l in zip(rows, leads):

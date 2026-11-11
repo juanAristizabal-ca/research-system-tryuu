@@ -249,23 +249,6 @@ def choose_mailbox(candidates: list[str], business_domain: str, seed: dict, owne
 
 
 # ---------------------------------------------------------------- LLM
-def llm_complete(prompt: str, model: str, max_tokens: int = 1200) -> str:
-    """Anthropic Messages API over plain HTTP (no SDK dependency). Needs ANTHROPIC_API_KEY."""
-    import requests
-
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
-    r = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-        json={"model": model, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]},
-        timeout=90,
-    )
-    r.raise_for_status()
-    return "".join(b.get("text", "") for b in r.json()["content"])
-
-
 def extract_json(text: str) -> dict | None:
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
@@ -320,3 +303,47 @@ def suppression_reasons(conn, business_id: int, cooldown_days: int | None = None
     if conn.execute("SELECT 1 FROM onboarded WHERE business_id=?", (business_id,)).fetchone():
         reasons.append("already live on Tryuu")
     return reasons
+
+
+# ---------------------------------------------------------------- DNS (free soft verification)
+_MX_CACHE: dict[str, bool | None] = {}
+
+
+def mx_ok(domain: str) -> bool | None:
+    """True if the domain can receive mail (has a real MX), False if it cannot (NXDOMAIN, no MX, null MX),
+    None if we could not tell. Uses DNS-over-HTTPS because outbound port 25 is blocked here."""
+    import requests
+
+    domain = domain.lower().strip()
+    if domain in _MX_CACHE:
+        return _MX_CACHE[domain]
+    res = None
+    try:
+        j = requests.get("https://cloudflare-dns.com/dns-query", params={"name": domain, "type": "MX"},
+                         headers={"accept": "application/dns-json"}, timeout=10).json()
+        if j.get("Status") == 3:
+            res = False
+        elif j.get("Status") == 0:
+            ans = [a["data"].split()[-1] for a in j.get("Answer", []) if a.get("type") == 15]
+            res = bool(ans) and not all(x == "." for x in ans)
+    except (requests.RequestException, ValueError, KeyError):
+        res = None
+    _MX_CACHE[domain] = res
+    return res
+
+
+def dedupe_pages(texts: list[str], n: int = 8) -> list[str]:
+    """Drop runs of n+ words already seen on an earlier page (navigation, footers) to keep prompts short."""
+    seen: set[tuple] = set()
+    out = []
+    for t in texts:
+        toks = t.split()
+        keep = [True] * len(toks)
+        wins = [tuple(toks[i:i + n]) for i in range(max(len(toks) - n + 1, 0))]
+        for i, w in enumerate(wins):
+            if w in seen:
+                for j in range(i, i + n):
+                    keep[j] = False
+        seen.update(wins)
+        out.append(" ".join(w for w, k in zip(toks, keep) if k))
+    return out
