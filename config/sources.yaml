@@ -16,7 +16,7 @@ discover:
   licences: {enabled: true}                    # municipal open-data CSVs, ingested with: 01_discover.py licences <csv>
   directories: {enabled: false}                # only where robots/terms allow; enable per directory deliberately
 verify:
-  min_level: valid                 # valid = verified by Instantly (strict, plan default) | mx_only = free DNS check only
+  min_level: mx_only               # owner decision 2026-11-11: no Instantly verification; some bounces are accepted. Free DNS (MX) check only
   max_age_days: 14                 # outbound port 25 is blocked here, so SMTP checks are not possible; Instantly credits are scarce
 google_places: {enabled: false, hard_quota_per_month: 4000}
 offlimits: [yelp.com, yellowpages.ca, cylex.ca, showmelocal.com, classpass.com, mapquest.com, foursquare.com]
