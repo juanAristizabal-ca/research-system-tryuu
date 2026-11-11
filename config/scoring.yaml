@@ -1,0 +1,13 @@
+# Starting weights (a guess). Corrected from results via the feedback rules in 12_report.
+tiers: {A: 70, B: 45}     # score >= A -> Tier A; >= B -> Tier B; else X (not contacted)
+signals:
+  proven_segment: 25
+  free_offer_with_quote: 20
+  named_owner: 15
+  person_mailbox: 10
+  one_or_two_locations: 10
+  launch_city_postal: 10
+  new_licence_12m: 5
+  online_booking_link: 5
+caps:
+  catch_all_max_tier: B   # catch-all domains never reach Tier A

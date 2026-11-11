@@ -1,0 +1,8 @@
+data/tryuu.db
+data/tryuu.db-*
+data/raw/
+data/loads/
+data/backups/
+__pycache__/
+*.pyc
+.env

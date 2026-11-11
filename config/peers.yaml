@@ -1,0 +1,5 @@
+# Peer business named in emails: any live business may be used (owner decision).
+# Fill url/offer per segment as listings are confirmed. Used by 08_load for {{Peer_*}} variables.
+classes_studios: {business: "Vancity Wing Chun", offer: "Wing Chun trial class", url: ""}
+advisors:        {business: "Career Coaching with John", offer: "", url: ""}
+counselling:     {business: "Persist Counselling Services", offer: "", url: ""}
