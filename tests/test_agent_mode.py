@@ -79,8 +79,21 @@ class AgentMode(unittest.TestCase):
         c.execute("INSERT INTO scores VALUES (?,90,'A','{}','t',?)", (bid, lib.now()))
         c.execute("UPDATE contacts SET verification='mx_only' WHERE business_id=?", (bid,))
         c.commit()
-        self.assertEqual(v.settle(c), (0, 0))   # default min_level=valid: a DNS check alone does not load
+        real = lib.load_yaml
+        def strict(name):
+            d = real(name)
+            if name == "sources.yaml":
+                d["verify"]["min_level"] = "valid"
+            return d
+        lib.load_yaml = strict
+        try:
+            self.assertEqual(v.settle(c), (0, 0))   # strict level: a DNS check alone does not load
+        finally:
+            lib.load_yaml = real
         self.assertEqual(c.execute("SELECT status FROM businesses").fetchone()[0], "scored")
+        self.assertEqual(v.settle(c), (1, 0))        # configured level (mx_only, owner decision) loads it
+        c.execute("UPDATE businesses SET status='scored'")
+        c.commit()
         res = self.dir / "r.json"
         res.write_text(json.dumps([{"email": "jane@calm.ca", "verification_status": "verified", "catch_all": True}]))
         class A: file = str(res)
