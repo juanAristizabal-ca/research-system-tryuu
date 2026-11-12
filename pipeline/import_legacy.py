@@ -36,6 +36,7 @@ def upsert(conn, email: str, name: str, city: str, website: str, origin: str, ph
     dom = lib.email_domain(email)
     dom = "" if lib.is_free_mail(dom) else dom
     wdom = lib.norm_domain(website)
+    wdom = "" if lib.is_free_mail(wdom) else wdom
     dom = wdom or dom
     site = (website if website.startswith("http") else f"https://{wdom}") if wdom else (f"https://{dom}" if dom else None)
     row = conn.execute("SELECT id FROM businesses WHERE domain=?", (dom,)).fetchone() if dom else \
@@ -152,6 +153,9 @@ def do_instantly_json(path: Path, names: dict):
         bid = upsert(conn, email, name, pl.get("City", ""), it.get("website") or it.get("company_domain") or "", "instantly")
         if bid is None:
             continue
+        if it.get("lt_interest_status") not in (None, 0):
+            conn.execute("INSERT OR REPLACE INTO evidence(business_id, field, value, quote) VALUES (?,?,?,?)",
+                         (bid, "instantly_interest", str(it["lt_interest_status"]), "Instantly lead interest status"))
         camp = names.get(it.get("campaign"), it.get("campaign"))
         ts = lib.parse_ts(it.get("timestamp_last_contact") or "")
         st = it.get("status")
