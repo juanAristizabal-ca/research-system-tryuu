@@ -1,4 +1,4 @@
-# Segments, search terms and OSM tags. Change = new config version + reason in change log.
+# Launch geography. Categories now live in config/categories.yaml.
 launch_cities:            # Greater Vancouver (15 incl. Pitt Meadows; Master sheet uses these names)
   - Vancouver
   - Burnaby
@@ -15,32 +15,9 @@ launch_cities:            # Greater Vancouver (15 incl. Pitt Meadows; Master she
   - Maple Ridge
   - White Rock
   - Pitt Meadows
-city_aliases:             # normalised on resolve
+city_aliases:
   "Langley Twp": Langley
   "District of North Vancouver": North Vancouver
   "City of North Vancouver": North Vancouver
   "Mount Pleasant": Vancouver
   "Hastings-Sunrise": Vancouver
-
-segments:
-  classes_studios:        # studios, fitness, martial arts, tutoring, music
-    proven: true
-    noun: "classes and studios"
-    keywords: [yoga studio, pilates studio, martial arts, karate, jiu jitsu, boxing gym, crossfit, dance studio, music lessons, piano lessons, tutoring, math tutoring, art classes, swim school, gymnastics]
-    osm: ["leisure=fitness_centre", "sport=martial_arts", "amenity=dancing_school", "amenity=music_school", "amenity=language_school"]
-  advisors:               # real estate, coaching, accounting, insurance, immigration
-    proven: true
-    noun: "advisors and consultants"
-    keywords: [career coach, life coach, immigration consultant, accountant, bookkeeper, insurance broker, real estate agent, mortgage broker, financial planner]
-    osm: ["office=accountant", "office=insurance", "office=consulting", "office=coaching", "office=estate_agent", "office=lawyer"]
-  counselling:
-    proven: true
-    noun: "counselling and therapy"
-    keywords: [counselling, counsellor, therapist, psychotherapy, family therapy, marriage counselling, addiction counselling]
-    osm: ["healthcare=psychotherapist", "healthcare=counselling"]
-  # On hold until each passes a 300-lead test batch (plan 9.2 rule 3).
-  trades:    {proven: false, hold: true, noun: "home services", keywords: [plumber, electrician, roofing, cleaning service], osm: ["craft=plumber", "craft=electrician"]}
-  auto:      {proven: false, hold: true, noun: "auto services", keywords: [auto repair, car dealership], osm: ["shop=car_repair", "shop=car"]}
-  retail:    {proven: false, hold: true, noun: "shops", keywords: [boutique, specialty store], osm: ["shop=clothes", "shop=gift"]}
-  food:      {proven: false, hold: true, noun: "food and drink", keywords: [cafe, bakery, ice cream], osm: ["amenity=cafe", "shop=bakery"]}
-  other:     {proven: false, hold: true, noun: "local businesses", keywords: [], osm: []}

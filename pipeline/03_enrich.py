@@ -203,7 +203,7 @@ def apply_extraction(conn, bid: int, data: dict) -> dict:
     pages = conn.execute("SELECT url, text FROM pages WHERE business_id=?", (bid,)).fetchall()
     alltext = "\n".join(p["text"] or "" for p in pages)
     biz = conn.execute("SELECT * FROM businesses WHERE id=?", (bid,)).fetchone()
-    segs = lib.load_yaml("segments.yaml")["segments"]
+    segs = lib.segment_catalog()
     ev = {}
 
     def put(field, value, quote=None, url=None):

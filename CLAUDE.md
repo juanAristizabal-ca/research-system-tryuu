@@ -60,9 +60,18 @@ Bounce protection in Instantly stays on; bounces are synced, suppressed, and rep
 discovered -> enriched (crawl + extract) -> scored (Tier A/B) -> verified -> loaded -> sent -> replied | onboarded.
 `suppressed` and `closed` are side states. Suppression is rebuilt from facts by `06_suppress.py`.
 
+## Categories (research is run per category)
+
+Tryuu welcomes every kind of business, from individuals to global brands. `config/categories.yaml` is the catalogue (71
+categories in 13 groups): the legacy campaign codes that already searched each one, Maps search keywords, and the `types`
+tokens that classify the 26k known businesses. `python pipeline/category_report.py` writes `reports/category_coverage.*`:
+known / emailed / never-contacted / live per category plus a status suggestion. `exhausted by our sweeps` means our own
+lists are used up, not the market. Categories marked `proposed: true` have not been searched. Brands/chains and
+municipal centres are separate tracks with different contacts (owner decision pending).
+
 ## Config
 
-`segments.yaml` segments, cities, search terms, OSM tags | `scoring.yaml` weights, tier cut-offs |
+`categories.yaml` categories, keywords, legacy campaigns | `segments.yaml` launch cities | `scoring.yaml` weights, tier cut-offs |
 `sources.yaml` crawl, LLM size, verify level, load limits, git | `suppression_seed.yaml` mailbox rules, cooldowns |
 `peers.yaml` peers | `extraction_prompt.md` fixed instructions | `sequences/` copy | `reply_templates/` the four replies.
 

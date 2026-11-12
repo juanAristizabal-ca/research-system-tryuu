@@ -94,7 +94,7 @@ class Flow(unittest.TestCase):
         return bid
 
     def extract(self, bid, **over):
-        data = {"segment": "counselling", "segment_quote": "individual therapy in Burnaby",
+        data = {"segment": "counselling_therapy", "segment_quote": "individual therapy in Burnaby",
                 "offer": {"sentence": "Book a free consultation to see if we are a fit", "url": "https://calm.ca", "type": "consultation"},
                 "owner": {"first_name": "Jane", "role": "owner", "quote": "Jane Doe, registered counsellor and owner", "url": "https://calm.ca"},
                 "accepting_clients": "true", "location_count": 1, "franchise_wording": False,
@@ -125,7 +125,7 @@ class Flow(unittest.TestCase):
         out = self.extract(bid)
         self.assertEqual(out["email"], "jane@calm.ca")
         sc = load("04_score.py")
-        cfg, segs = lib.load_yaml("scoring.yaml"), lib.load_yaml("segments.yaml")["segments"]
+        cfg, segs = lib.load_yaml("scoring.yaml"), lib.segment_catalog()
         b = c.execute("SELECT * FROM businesses WHERE id=?", (bid,)).fetchone()
         score, sig = sc.compute(c, b, cfg, segs, lib.city_set())
         self.assertEqual(score, 25 + 20 + 15 + 10 + 10 + 10)  # no booking link, no licence
@@ -133,14 +133,14 @@ class Flow(unittest.TestCase):
         c.execute("UPDATE contacts SET verification='valid', verified_at=? WHERE business_id=? AND is_chosen=1", (lib.now(), bid))
         lib.set_status(c, bid, "verified")
         c.execute("INSERT INTO llm_tasks(kind, business_id, prompt, prompt_hash, response, status) VALUES ('segment_check',?,?,?,?, 'done')",
-                  (bid, "p", "h", '{"segment": "counselling"}'))
+                  (bid, "p", "h", '{"segment": "counselling_therapy"}'))
         chk = load("07_check.py")
         fails = chk.evaluate(c, c.execute("SELECT * FROM businesses WHERE id=?", (bid,)).fetchone(), lib.city_set(), 14, None, True)
         self.assertEqual(fails, [])
         c.execute("INSERT INTO checks(business_id, passed, failures) VALUES (?,1,'[]')", (bid,))
         c.commit()
         ld = load("08_load.py")
-        rows = ld.select(c, "counselling", "A", 10)
+        rows = ld.select(c, "counselling_therapy", "A", 10)
         v = ld.lead_vars(c, rows[0], lib.load_yaml("peers.yaml"), segs)
         self.assertEqual(v["email"], "jane@calm.ca")
         self.assertIn("?r=", v["custom_variables"]["Signup_Link"])
@@ -195,7 +195,7 @@ class Flow(unittest.TestCase):
         c.execute("INSERT INTO scores VALUES (?,90,'A','{}','t',?)", (bid, lib.now()))
         c.execute("INSERT INTO checks(business_id, passed, failures) VALUES (?,0,'[]')", (bid,))
         ld = load("08_load.py")
-        p, n = ld.precision(c, "counselling", "A")
+        p, n = ld.precision(c, "counselling_therapy", "A")
         self.assertEqual((p, n), (0.0, 1))
 
 

@@ -19,7 +19,7 @@ SEGMENT_CHECK = ("For each task decide, from ONLY the website text, which single
 
 
 def instructions(kind: str) -> str:
-    segs = ", ".join(lib.load_yaml("segments.yaml")["segments"])
+    segs = ", ".join(lib.segment_catalog())
     if kind == "extract":
         return (lib.CONFIG / "extraction_prompt.md").read_text().replace("{segments}", segs)
     return SEGMENT_CHECK.format(segments=segs)

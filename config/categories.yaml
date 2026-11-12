@@ -1,0 +1,125 @@
+# Category catalogue. Tryuu welcomes EVERY kind of business (individuals to global brands); research is run per category.
+# Order matters: the first category whose `types` substring matches a business type wins, so specific ones come first.
+# types      substrings matched (lower case) against the business type text (Instantly export / Master sheet / site extraction)
+# keywords   Google Maps / directory search terms used by 01_discover (gosom)
+# campaigns  legacy Instantly campaign codes that already searched this category (F003 cars/home/auto is still pending approval)
+# proven     true = score bonus (segments with onboards so far); change only through scoring evidence (plan section 8.4)
+# Coverage numbers are NOT stored here: run `python pipeline/category_report.py` (reads the database).
+
+groups:
+  fitness_movement: Fitness and movement
+  learning: Learning and kids
+  health_wellness: Health and wellness
+  beauty: Beauty and personal care
+  professional: Professional and financial services
+  home_services: Home services and construction
+  auto: Automotive
+  food_drink: Food, drink and nightlife
+  retail: Retail and shops
+  experiences: Experiences, events and travel
+  creative: Creative, arts and media
+  pets: Pets and animals
+  brands: "Brands, chains and franchises (separate track, corporate contacts)"
+  excluded: Not targets (associations, consulates, government)
+
+categories:
+  # ---------------- excluded first so they never leak into real categories
+  associations_gov:     {group: excluded, noun: "associations and public bodies", types: [consulate, business improvement association, city of, government, place of worship, cultural association, non-profit, church, temple], keywords: [], campaigns: [], excluded: true}
+
+  # ---------------- fitness and movement
+  yoga_pilates:         {group: fitness_movement, noun: "yoga and pilates studios", types: [yoga, pilates, barre], keywords: [yoga studio, pilates studio, barre studio], campaigns: [B003, B016, C001, C002, E001, E008], proven: true}
+  martial_arts:         {group: fitness_movement, noun: "martial arts schools", types: [martial art, karate, taekwondo, jiu, judo, kickbox, muay thai, boxing, krav, wing chun, aikido, kung fu, fencing], keywords: [martial arts, karate, jiu jitsu, boxing gym, taekwondo], campaigns: [B003, B016, C001, E001, E008], proven: true}
+  gyms_training:        {group: fitness_movement, noun: "gyms and personal trainers", types: [gym, fitness, crossfit, personal trainer, bootcamp, strength, trainer], keywords: [gym, fitness studio, crossfit, personal trainer], campaigns: [B003, B016, C001, E008], proven: true}
+  dance:                {group: fitness_movement, noun: "dance studios", types: [dance, ballet, salsa, swing], keywords: [dance studio, ballet school, salsa classes], campaigns: [B003, B013, C001, E001], proven: true}
+  swim_sports_clubs:    {group: fitness_movement, noun: "swim schools and sports clubs", types: [swim, gymnastic, sports club, sports instructor, hockey, soccer, tennis, climbing, skating, golf lesson, sports academy, sports centre, sports center], keywords: [swim school, gymnastics club, climbing gym, sports club], campaigns: [B016, E008], proven: true}
+
+  # ---------------- learning and kids
+  tutoring:             {group: learning, noun: "tutoring centres", types: [tutor, math, learning centre, learning center, test prep, academic, homework, kumon], keywords: [tutoring, math tutoring, learning centre, test prep], campaigns: [B003, C001, E010], proven: true}
+  music_lessons:        {group: learning, noun: "music schools and teachers", types: [music school, music teacher, music studio, piano, guitar, violin, voice lesson, lesson centre, music lesson], keywords: [music lessons, piano lessons, guitar lessons, music school], campaigns: [B003, B013, C001, E001], proven: true}
+  language_schools:     {group: learning, noun: "language schools", types: [language school, english school, esl, french school, mandarin school, language centre], keywords: [language school, english school, esl school], campaigns: [E010, D003]}
+  driving_schools:      {group: learning, noun: "driving schools", types: [driving], keywords: [driving school, driving instructor], campaigns: [E010]}
+  childcare_early:      {group: learning, noun: "daycares and preschools", types: [daycare, montessori, preschool, out-of-school, childcare, kindergarten, nursery school, after-school], keywords: [daycare, montessori school, preschool, after school care], campaigns: [D004]}
+  kids_activities:      {group: learning, noun: "kids camps and activity centres", types: [kids camp, camp, kids activity, children, play centre, play center, party venue], keywords: [kids camp, kids activities, indoor playground], campaigns: [B010, B016]}
+  training_colleges:    {group: learning, noun: "colleges and training schools", types: [college, training school, career training, coding school, school, academy, institute, university, vocational, bootcamp school, lesson, instructor, workshop], keywords: [career college, training school, coding school, workshop], campaigns: [B010, E010]}
+
+  # ---------------- health and wellness
+  counselling_therapy:  {group: health_wellness, noun: "counselling and therapy", types: [counsel, psycholog, therap, psychotherap, hypnother, mental health, social work, addiction, family and couples], keywords: [counselling, counsellor, psychologist, psychotherapy, family therapy], campaigns: [E003, F006], proven: true}
+  physio_chiro_massage: {group: health_wellness, noun: "physio, chiropractic and massage", types: [physio, chiropract, massage, osteopath, kinesiolog, bodywork, sports medicine, rehab], keywords: [physiotherapy, chiropractor, massage therapy, osteopath], campaigns: [B006, B007, B008, B009, F006]}
+  acupuncture_naturopathic: {group: health_wellness, noun: "acupuncture, TCM and naturopathic", types: [acupunct, naturopath, traditional chinese, tcm, herbal, holistic, homeopath, ayurved, reflexolog, reiki], keywords: [acupuncture, naturopathic clinic, traditional chinese medicine], campaigns: [B006, B007, B008, B009, F006]}
+  dental:               {group: health_wellness, noun: "dentists and orthodontists", types: [dental, dentist, orthodon, denture], keywords: [dentist, dental clinic, orthodontist], campaigns: [F004]}
+  medical_eye_care:     {group: health_wellness, noun: "clinics, optometry and medical", types: [medical, optomet, eye care, clinic, doctor, health practice, wellness centre, wellness center, podiat, dermatolog, hearing, audiolog, pharmacy, health centre, health center], keywords: [medical clinic, optometrist, podiatrist, walk-in clinic], campaigns: [B006, F006]}
+  nutrition_doula:      {group: health_wellness, noun: "nutrition, doulas and wellness coaching", types: [nutrition, dietit, doula, midwife, lactation, wellness coach, health coach], keywords: [dietitian, nutritionist, doula, midwife], campaigns: [B006, F006]}
+
+  # ---------------- beauty and personal care
+  hair_barber:          {group: beauty, noun: "hair salons and barbers", types: [hair, barber, salon], keywords: [hair salon, barbershop, hair stylist], campaigns: [B006, B007, B008, B009, "Beauty and skin care"]}
+  nails_lashes_brows:   {group: beauty, noun: "nails, lashes and brows", types: [nail, lash, brow, makeup, waxing, threading, eyelash, esthetic], keywords: [nail salon, lash extensions, brow studio, waxing], campaigns: [B006, B007, B008, B009, "Beauty and skin care"]}
+  skin_laser_medspa:    {group: beauty, noun: "skin care, laser and med spas", types: [skin, laser, med spa, medspa, aesthetic, facial, botox, cosmetic, electrolysis], keywords: [skin care clinic, laser clinic, med spa, facial], campaigns: [B006, B007, B008, B009, "Beauty and skin care"]}
+  spas_tattoo_tanning:  {group: beauty, noun: "spas, tattoo and tanning", types: [=spa, tattoo, tanning, piercing, float, sauna, wellness lounge], keywords: [day spa, tattoo studio, tanning salon, float spa], campaigns: [B006, B007, B008, B009]}
+
+  # ---------------- professional and financial services
+  law:                  {group: professional, noun: "law firms and notaries", types: [law firm, lawyer, legal, notary, paralegal, barrister, attorney], keywords: [law firm, lawyer, notary public], campaigns: [B021]}
+  accounting_tax:       {group: professional, noun: "accountants and bookkeepers", types: [account, bookkeep, =tax, =cpa, payroll, audit], keywords: [accountant, bookkeeper, tax preparation, cpa], campaigns: [D001]}
+  real_estate:          {group: professional, noun: "real estate", types: [real estate, realtor, property manage, realty, broker brokerage], keywords: [real estate agent, realtor, property management], campaigns: [B020], proven: true}
+  mortgage_insurance_finance: {group: professional, noun: "mortgage, insurance and financial planning", types: [mortgage, insurance, financial, wealth, investment, advisor, loan, credit], keywords: [mortgage broker, insurance broker, financial planner, wealth advisor], campaigns: [D002, F005], proven: true}
+  immigration_consulting: {group: professional, noun: "immigration and education consultants", types: [immigration, consultancy, visa, education consult, study abroad, translation], keywords: [immigration consultant, study permit consultant, translation services], campaigns: [D003], proven: true}
+  coaching:             {group: professional, noun: "coaches and consultants", types: [coach, consult, mentor, life coach, career, business advisor, strategy], keywords: [life coach, career coach, business coach, consultant], campaigns: [C006], proven: true}
+  architecture_design:  {group: professional, noun: "architects and designers", types: [architect, interior design, design studio, drafting, home design, landscape design, designer], keywords: [architect, interior designer, home designer], campaigns: [D005]}
+  it_security_tech:     {group: professional, noun: "IT, security and tech services", types: [it support, technology, network, security, software, web design, web development, managed it, cyber, telecom, smart home, home systems, alarm], keywords: [it support, security systems, web design agency, managed it], campaigns: [C009]}
+  marketing_print_signs: {group: professional, noun: "print, signs and marketing", types: [print, sign, promotional, marketing, advertising, graphic, branding, =seo, agency], keywords: [print shop, sign shop, promotional products, marketing agency], campaigns: [D010]}
+  coworking_offices:    {group: professional, noun: "coworking and office rentals", types: [cowork, office, business centre, business center, executive suite, shared workspace], keywords: [coworking space, executive suites, office rental], campaigns: [B022]}
+  staffing_hr_other_pro: {group: professional, noun: "other professional services", types: [staffing, recruit, =hr, courier, notary, surveyor, engineer, bookkeeping software], keywords: [recruitment agency, courier service, surveyor], campaigns: [F002]}
+
+  # ---------------- home services and construction
+  renovation_builders:  {group: home_services, noun: "renovation and construction", types: [renovat, builder, construction, concrete, mason, deck, railing, siding, exterior, paint, tile, flooring company, paving, fenc, window and door, drywall, framing, basement, kitchen renovation, general contractor, contractor], keywords: [renovation company, general contractor, home builder, painting company], campaigns: [C002, C008]}
+  roofing_hvac_plumbing_electric: {group: home_services, noun: "plumbing, electrical, HVAC and roofing", types: [plumb, electric, heating, cooling, hvac, roof, furnace, gas fitter, handyman, appliance repair, locksmith, garage door, chimney], keywords: [plumber, electrician, hvac, roofing, locksmith], campaigns: [C003, C009]}
+  cleaning_moving_landscape: {group: home_services, noun: "cleaning, moving and landscaping", types: [clean, mov, landscap, junk, pest, tree service, lawn, snow, window clean, pressure wash, home organiz, laundry, dry clean, fabric care], keywords: [cleaning service, moving company, landscaping, pest control, junk removal], campaigns: [C004, F008]}
+  home_retail_showrooms: {group: home_services, noun: "home retail and showrooms", types: [furniture, home decor, flooring store, lighting, window covering, kitchen showroom, showroom, mattress, appliance, rug, cabinet, closet, blinds, bath, fireplace, hot tub, pool, garden centre, nursery, glass and mirror], keywords: [furniture store, home decor, kitchen showroom, lighting store, hot tub, garden centre], campaigns: [C005, D009, F008]}
+
+  # ---------------- automotive
+  car_dealers:          {group: auto, noun: "car and vehicle dealers", types: [car dealership, used car, dealer, powersports, motorcycle, =rv, boat dealer, truck, auto sales, auto group], keywords: [car dealership, used cars, motorcycle dealer, rv dealer], campaigns: [B019, C007, E004, F003]}
+  auto_services:        {group: auto, noun: "auto repair and services", types: [auto repair, auto glass, vehicle customization, auto body, collision, tire, detailing, car wash, mechanic, oil change, car audio, tinting, towing], keywords: [auto repair, auto body, car detailing, tire shop], campaigns: [C007, F003]}
+
+  # ---------------- food, drink and nightlife
+  restaurants:          {group: food_drink, noun: "restaurants", types: [restaurant, grill, bistro, eatery, steakhouse, sushi, pizz, noodle, diner, brasserie, kitchen, food truck, takeout], keywords: [restaurant, sushi, pizza, steakhouse], campaigns: [E005]}
+  cafes_bakeries_sweets: {group: food_drink, noun: "cafes, bakeries and sweets", types: [coffee, cafe, café, bakery, dessert, =tea, gelato, ice cream, chocolate, donut, juice, bubble, patisserie, candy], keywords: [coffee shop, bakery, ice cream, dessert cafe, bubble tea], campaigns: [C010, E005]}
+  bars_nightlife:       {group: food_drink, noun: "bars, breweries and nightlife", types: [=pub, =bar, brewery, =club, nightclub, lounge, winery, distillery, cidery, taproom, karaoke, cocktail], keywords: [pub, brewery, nightclub, winery, cocktail bar], campaigns: [B012, E006]}
+  catering_specialty_food: {group: food_drink, noun: "catering and specialty food", types: [cater, deli, butcher, grocer, specialty food, market, fish, farm, meal prep, spice, import food, seafood, alcohol, liquor, wine shop], keywords: [catering company, butcher shop, deli, specialty grocery], campaigns: [D011, E005]}
+
+  # ---------------- retail
+  fashion_accessories:  {group: retail, noun: "fashion, jewellery and accessories", types: [clothing, clothes, boutique, menswear, shoe, lingerie, bridal, jewel, tailor, fashion, apparel, handbag, eyewear, watch, kids and maternity, thrift, vintage clothing, baby], keywords: [clothing boutique, jewellery store, shoe store, bridal shop], campaigns: [D006, F001, C011]}
+  gifts_hobby_books:    {group: retail, noun: "gifts, hobby, books and florists", types: [specialty shop, craft shop, craft and fabric, antique, toy, game, comic, bookstore, book, florist, flower, plant, music store, gift, stationery, hobby, framing, art supply, souvenir], keywords: [gift shop, bookstore, florist, toy store, craft store], campaigns: [C011, F001]}
+  sports_outdoor_retail: {group: retail, noun: "sports, bike and outdoor retail", types: [bike, outdoor, sporting goods, golf shop, =ski, snowboard, camping, fishing, surf, skate shop, fitness equipment], keywords: [bike shop, outdoor store, sporting goods, ski shop], campaigns: [D007, F001]}
+  health_retail_other:  {group: retail, noun: "health retail and other shops", types: [medical equipment, supplement, vitamin, pharmacy store, cannabis, vape, smoke, convenience, electronics, phone repair, computer store, optical, gift card, pawn, thrift store, orthotic, compression], keywords: [vitamin store, electronics store, phone repair], campaigns: [C011, F001]}
+
+  # ---------------- experiences, events and travel
+  tours_attractions:    {group: experiences, noun: "tours and attractions", types: [tour, attraction, activity venue, adventure, escape room, museum, zoo, aquarium, cruise, whale, rafting, zipline, =vr, arcade, axe, bowling, paintball, theme, marina, rental kayak, paddleboard], keywords: [tour company, escape room, adventure activity, boat tour], campaigns: [B011, E007]}
+  events_entertainment: {group: experiences, noun: "events and entertainment", types: [event, production, theatre, theater, arts centre, rental company, party, wedding, =dj, entertainment, venue, banquet, photo booth, comedy, cinema, concert], keywords: [event planner, wedding venue, party rental, theatre], campaigns: [B013, B014, F007]}
+  travel_stays:         {group: experiences, noun: "travel agencies and stays", types: [travel, hotel, resort, hostel, bed and breakfast, b&b, lodge, vacation, motel, inn, stays], keywords: [travel agency, hotel, bed and breakfast], campaigns: [B015, D008]}
+
+  # ---------------- creative, arts and media
+  photo_video:          {group: creative, noun: "photographers and video", types: [photo, video, film, studio production, drone, portrait], keywords: [photographer, photo studio, videographer], campaigns: [B017, F007]}
+  art_galleries_studios: {group: creative, noun: "art galleries and studios", types: [art studio, art gallery, gallery, artist, illustrator, pottery, ceramic, glass studio, craft studio, art and craft, sculpt, art class, painting studio], keywords: [art gallery, art studio, pottery studio, craft studio], campaigns: [B010, B017, E002], proven: true}
+  music_performing:     {group: creative, noun: "bands, music venues and performing arts", types: [band, orchestra, choir, music venue, recording, acting, theatre school, performing, improv, studio rehearsal], keywords: [recording studio, acting school, rehearsal studio, choir], campaigns: [B013]}
+
+  # ---------------- pets
+  pet_services:         {group: pets, noun: "pet services and vets", types: [pet, veterinar, dog, groom, animal, kennel, boarding, =cat], keywords: [pet grooming, veterinary clinic, dog training, pet boarding], campaigns: [B018]}
+
+  # ---------------- PROPOSED (not searched yet): adjacent to the winning categories or showing demand in the live list
+  cooking_culinary_classes: {group: learning, noun: "cooking and culinary classes", types: [cooking, culinary, baking class, wine tasting, cooking school], keywords: [cooking classes, culinary school, baking classes, wine tasting], campaigns: [], proposed: true}
+  kids_stem_enrichment:  {group: learning, noun: "kids STEM and enrichment", types: [stem, robotics, kids coding, enrichment, science camp], keywords: [kids coding, robotics classes, stem classes, science camp], campaigns: [], proposed: true}
+  private_schools:       {group: learning, noun: "private and independent schools", types: [private school, independent school, waldorf, international school], keywords: [private school, independent school, waldorf school], campaigns: [], proposed: true}
+  adult_sports_leagues:  {group: fitness_movement, noun: "adult leagues, rinks and sports venues", types: [league, pickleball, volleyball, curling, ice rink, arena, trampoline, bowling, golf course, driving range, tennis club, badminton], keywords: [adult sports league, pickleball, trampoline park, ice rink, driving range], campaigns: [], proposed: true}
+  meditation_mindfulness: {group: health_wellness, noun: "meditation and mindfulness", types: [meditation, mindfulness, breathwork, sound healing, retreat], keywords: [meditation studio, mindfulness, breathwork, sound bath], campaigns: [], proposed: true}
+  senior_home_care:      {group: health_wellness, noun: "senior and home care", types: [home care, senior, care home, assisted living, caregiv], keywords: [home care services, senior care, assisted living], campaigns: [], proposed: true}
+  markets_festivals:     {group: experiences, noun: "markets, fairs and festivals", types: [festival, craft fair, farmers market, pop-up, night market, fair], keywords: [craft fair, farmers market, night market, festival], campaigns: [], proposed: true}
+  wedding_services:      {group: experiences, noun: "wedding planners, venues and officiants", types: [wedding planner, officiant, wedding venue, bridal makeup], keywords: [wedding planner, wedding venue, marriage officiant], campaigns: [F007], proposed: true}
+  outdoor_rentals:       {group: experiences, noun: "outdoor and boat rentals", types: [kayak, paddleboard, bike rental, ski rental, boat rental, rentals], keywords: [kayak rental, paddleboard rental, bike rental, boat rental], campaigns: [], proposed: true}
+  makerspaces_workshops: {group: creative, noun: "makerspaces and workshop spaces", types: [makerspace, maker space, woodworking, fab lab, workshop space], keywords: [makerspace, woodworking classes, workshop space], campaigns: [], proposed: true}
+  home_specialty:        {group: home_services, noun: "solar, insulation and home inspection", types: [solar, insulation, home inspect, energy, heat pump, window tint], keywords: [solar installer, home inspection, insulation, heat pump], campaigns: [], proposed: true}
+  online_services:       {group: professional, noun: "online and no-location services", types: [online, virtual, ecommerce, e-commerce, saas, subscription], keywords: [online coaching, virtual tutoring, online classes], campaigns: [B005], proposed: true}
+  public_rec_community:  {group: experiences, noun: "city recreation and community centres", types: [recreation centre, rec centre, community centre, library], keywords: [recreation centre, community centre], campaigns: [], proposed: true, track: "municipal, different contact path"}
+  banks_credit_unions:   {group: brands, noun: "banks and credit unions", types: [bank, credit union], keywords: [credit union, bank branch], campaigns: [], proposed: true, track: "brand track"}
+  national_brands:       {group: brands, noun: "chains, franchises and global brands", types: [franchise, chain, corporation], keywords: [], campaigns: [], proposed: true, track: "brand track: marketing/partnership contacts, not owners"}
+
+  # ---------------- catch-all, must stay last
+  other_unclassified:   {group: excluded, noun: "unclassified", types: [], keywords: [], campaigns: [], excluded: true}

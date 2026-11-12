@@ -92,7 +92,7 @@ def main():
     if prec < lim["min_precision"] and not a.force:
         sys.exit(f"research precision {prec:.0%} over {n} checked leads is under {lim['min_precision']:.0%}; fix the failing checks first.")
     rows = select(conn, a.segment, a.tier, a.size)
-    peers, segs = lib.load_yaml("peers.yaml"), lib.load_yaml("segments.yaml")["segments"]
+    peers, segs = lib.load_yaml("peers.yaml"), lib.segment_catalog()
     scoring_v = lib.config_version(conn, "scoring.yaml")
     week = dt.date.today().strftime("%Y-W%W")
     name = f"{a.segment}_{a.tier}_{a.copy_version}_{week}"

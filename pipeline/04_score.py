@@ -39,7 +39,7 @@ def tier_for(score: int, tiers: dict) -> str:
 def main():
     conn = lib.connect()
     ver = lib.config_version(conn, "scoring.yaml")
-    cfg, segs, cities = lib.load_yaml("scoring.yaml"), lib.load_yaml("segments.yaml")["segments"], lib.city_set()
+    cfg, segs, cities = lib.load_yaml("scoring.yaml"), lib.segment_catalog(), lib.city_set()
     with lib.run(conn, "04_score") as r:
         rows = conn.execute("SELECT * FROM businesses WHERE status IN ('enriched','scored','verified')").fetchall()
         r.n_in = len(rows)

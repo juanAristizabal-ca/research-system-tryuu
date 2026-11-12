@@ -100,6 +100,11 @@ def config_version(conn: sqlite3.Connection, name: str) -> str:
     return ver
 
 
+def segment_catalog() -> dict:
+    """Targetable categories from config/categories.yaml (the old segments.yaml `segments` block is gone)."""
+    return {k: v for k, v in load_yaml("categories.yaml")["categories"].items() if not v.get("excluded")}
+
+
 def city_set() -> set[str]:
     return {c.lower() for c in load_yaml("segments.yaml")["launch_cities"]}
 

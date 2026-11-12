@@ -2,7 +2,7 @@
 """Step 1 - Discover. Ingest raw rows from a source; keeps the untouched source file under data/raw/<date>/.
 
   01_discover.py gosom <results.csv>                    output of gosom/google-maps-scraper (run via Docker)
-  01_discover.py overpass <segment> --city Burnaby      OpenStreetMap via Overpass, tags from segments.yaml
+  01_discover.py overpass <segment> --city Burnaby      OpenStreetMap via Overpass, tags from config/categories.yaml (osm: [...])
   01_discover.py licences <file.csv> --name-col ... --city-col ... --date-col ... --city Vancouver
 Pass rule (plan 5.3): row has a name and either a website or a phone. Re-running is safe (row hash).
 """
@@ -100,10 +100,10 @@ def from_licences(path: Path, a):
 def from_overpass(segment: str, city: str):
     import requests
 
-    seg = lib.load_yaml("segments.yaml")["segments"][segment]
+    seg = lib.segment_catalog()[segment]
     cfg = lib.load_yaml("sources.yaml")["discover"]["overpass"]
     out, raw_all = [], []
-    for tag in seg["osm"]:
+    for tag in seg.get("osm", []):
         k, v = tag.split("=", 1)
         q = (f'[out:json][timeout:120];area["name"="{city}"]["boundary"="administrative"]->.a;'
              f'nwr["{k}"="{v}"]["name"](area.a);out center tags {cfg["max_per_query"]};')

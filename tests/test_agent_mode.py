@@ -53,13 +53,13 @@ class AgentMode(unittest.TestCase):
         self.assertIn("### TASK id=1", sheet)
         self.assertIn("verbatim quote", sheet)  # instructions present once
         ans = self.dir / "a.jsonl"
-        ans.write_text(json.dumps({"id": 1, "response": {"segment": "counselling"}}) + "\n" + json.dumps({"id": 2, "response": "not json"}) + "\n")
+        ans.write_text(json.dumps({"id": 1, "response": {"segment": "counselling_therapy"}}) + "\n" + json.dumps({"id": 2, "response": "not json"}) + "\n")
         self.conn.execute("INSERT INTO llm_tasks(kind, business_id, prompt, prompt_hash) VALUES ('extract', ?, 'x', 'h2')", (bid,))
         ok, bad = llm.import_answers(self.conn, ans)
         self.assertEqual((ok, bad), (1, 1))
         row = self.conn.execute("SELECT status, prompt FROM llm_tasks WHERE id=1").fetchone()
         self.assertEqual((row["status"], row["prompt"]), ("done", ""))  # prompt blanked to keep the db small
-        self.assertEqual(lib.get_llm_response(self.conn, "extract", bid), {"segment": "counselling"})
+        self.assertEqual(lib.get_llm_response(self.conn, "extract", bid), {"segment": "counselling_therapy"})
 
     def test_extract_screen_skips_unloadable_leads(self):
         enrich = load("03_enrich.py")

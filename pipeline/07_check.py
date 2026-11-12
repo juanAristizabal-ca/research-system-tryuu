@@ -79,7 +79,7 @@ def main():
     ap.add_argument("--offline", action="store_true")
     a = ap.parse_args()
     conn = lib.connect()
-    segs = list(lib.load_yaml("segments.yaml")["segments"])
+    segs = list(lib.segment_catalog())
     cities = lib.city_set()
     max_age = lib.load_yaml("sources.yaml")["verify"]["max_age_days"]
     crawler = None if a.offline else _crawler()
