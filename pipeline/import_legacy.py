@@ -39,10 +39,15 @@ def upsert(conn, email: str, name: str, city: str, website: str, origin: str, ph
     wdom = "" if lib.is_free_mail(wdom) else wdom
     dom = wdom or dom
     site = (website if website.startswith("http") else f"https://{wdom}") if wdom else (f"https://{dom}" if dom else None)
-    row = conn.execute("SELECT id FROM businesses WHERE domain=?", (dom,)).fetchone() if dom else \
-        conn.execute("SELECT id FROM businesses WHERE key=?", (f"e:{email}",)).fetchone()
+    row = conn.execute("SELECT business_id id FROM contacts WHERE email=? LIMIT 1", (email,)).fetchone()
+    if row is None and dom:
+        row = conn.execute("SELECT id FROM businesses WHERE domain=?", (dom,)).fetchone()
+    if row is None and not dom:
+        row = conn.execute("SELECT id FROM businesses WHERE key=?", (f"e:{email}",)).fetchone()
     if row:
         bid = row["id"]
+        if site:
+            conn.execute("UPDATE businesses SET website=? WHERE id=? AND website IS NULL", (site, bid))
     else:
         cur = conn.execute("INSERT INTO businesses(key, domain, name, city, phone, website, origin) VALUES (?,?,?,?,?,?,?)",
                            (lib.business_key(dom, "", email), dom or None, name.strip(), lib.norm_city(city) or None,
@@ -99,43 +104,61 @@ def do_master(path: Path):
 
 
 def pick(row: dict, *names):
-    low = {k.lower().strip(): v for k, v in row.items() if k}
+    low = {k.lower().strip(): v for k, v in row.items() if k and isinstance(v, str)}
     for n in names:
-        if low.get(n):
-            return low[n].strip()
+        v = (low.get(n) or "").strip()
+        if v and v.lower() != "none":
+            return v
     return ""
 
 
 def do_instantly(path: Path):
+    """Instantly leads export. status: 1 active, 3 completed, -1 bounced, -2 unsubscribed. 'lt_interest_status':
+    1 interested, -1 not interested, -2 wrong person, 0 out of office. A lead with a last-contact date was emailed;
+    without one it is sitting in a campaign (status 'loaded')."""
     archive(path)
-    stats = {"rows": 0, "bounced": 0, "unsubscribed": 0, "no_email": 0}
+    stats = {"rows": 0, "bounced": 0, "unsubscribed": 0, "interested": 0, "not_interested": 0, "replied": 0, "queued": 0, "skipped": 0}
     with path.open(newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
             stats["rows"] += 1
-            email = lib.norm_email(pick(row, "email"))
-            if not email:
-                stats["no_email"] += 1
-                continue
-            name = pick(row, "business_name", "company_name", "company") or pick(row, "first_name") or email.split("@")[0]
-            bid = upsert(conn, email, name, pick(row, "city"), pick(row, "website", "company_website"), "instantly", pick(row, "phone"))
+            email = lib.norm_email(pick(row, "email", "contact"))
+            name = (pick(row, "business_name", "companyname", "company_name") or pick(row, "first name", "first_name") or email.split("@")[0])
+            bid = upsert(conn, email, name, pick(row, "city", "businesscity"), pick(row, "website"), "instantly", pick(row, "phone"))
             if bid is None:
+                stats["skipped"] += 1
                 continue
-            camp = pick(row, "campaign", "campaign_name", "campaign_id")
-            status = pick(row, "status", "lead_status", "email_status").lower()
-            last = pick(row, "timestamp_last_contact", "last_contacted", "last_contact", "timestamp_created", "created")
-            ts = lib.parse_ts(last)
-            bounced = int("bounce" in status or status == "-1")
-            legacy_send(conn, bid, email, camp, ts.strftime("%Y-%m-%d %H:%M:%S") if ts else None, bounced)
-            if bounced:
+            camp = pick(row, "campaign name", "campaign")
+            st = pick(row, "status")
+            ts = lib.parse_ts(pick(row, "timestamp_last_contact"))
+            sent_at = ts.strftime("%Y-%m-%d %H:%M:%S") if ts else None
+            legacy_send(conn, bid, email, camp, sent_at, int(st == "-1"))
+            typ = pick(row, "business_type")
+            if typ:
+                conn.execute("INSERT OR IGNORE INTO evidence(business_id, field, value, quote) VALUES (?,?,?,?)", (bid, "legacy_business_type", typ, "Instantly export"))
+            if st == "-1":
                 supp(conn, "email", email, "bounced (Instantly)"); stats["bounced"] += 1
-            if "unsub" in status or status == "-2":
+            elif st == "-2":
                 supp(conn, "email", email, "unsubscribed (Instantly)")
                 d = lib.email_domain(email)
                 if not lib.is_free_mail(d):
                     supp(conn, "domain", d, "unsubscribed (Instantly)")
                 stats["unsubscribed"] += 1
-            if conn.execute("SELECT status FROM businesses WHERE id=?", (bid,)).fetchone()["status"] in ("discovered", "enriched"):
-                lib.set_status(conn, bid, "sent")
+            interest = pick(row, "lt_interest_status")
+            if interest == "1":
+                conn.execute("INSERT OR REPLACE INTO evidence(business_id, field, value, quote) VALUES (?,?,?,?)", (bid, "instantly_interest", "1", "Instantly lead interest status"))
+                stats["interested"] += 1
+            elif interest in ("-1", "-2"):
+                supp(conn, "email", email, "not interested / wrong person (Instantly)", 180); stats["not_interested"] += 1
+            cur = conn.execute("SELECT status FROM businesses WHERE id=?", (bid,)).fetchone()["status"]
+            if cur in ("onboarded", "suppressed", "closed"):
+                continue
+            if pick(row, "email_reply_count") not in ("", "0"):
+                lib.set_status(conn, bid, "replied"); stats["replied"] += 1
+            elif st != "-1" and cur in ("discovered", "enriched", "loaded"):
+                if sent_at:
+                    lib.set_status(conn, bid, "sent")
+                else:
+                    lib.set_status(conn, bid, "loaded"); stats["queued"] += 1
     conn.commit()
     return stats
 

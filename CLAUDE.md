@@ -14,6 +14,7 @@ Owner decisions (rebuild plan section 10.1) that are fixed:
 - Launch cities: Greater Vancouver only (`launch_cities` in `config/segments.yaml`).
 - The live-business list is uploaded DAILY by the owner. Research starts ONLY when the owner says so.
 - Any live business may be the peer business in an email (`config/peers.yaml`).
+- Campaigns already active in Instantly (16 on 2026-11-12) are fine and their sending limits are safe (owner, 2026-11-12). Never pause or change them unless asked.
 
 ## Hard rules
 
