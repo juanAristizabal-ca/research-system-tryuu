@@ -38,22 +38,21 @@ Start: `cd tryuu-outreach && git pull` (if a remote exists) then `python run.py 
 | Discover | scripts (Docker scraper, Overpass, licences) | `01_discover.py gosom <csv>` / `overpass <segment> --city X` / `licences <csv> ...` |
 | Research pipeline | scripts | `python run.py research` (02 resolve, 03 crawl, 03 extract screen+queue, 04 score, 05 mx check, 06 suppress, 07 check) |
 | Extraction and second-pass answers | **the agent** | `llm.py export <w.md> --kind extract --limit 25`, read it, write `answers.jsonl`, `llm.py import answers.jsonl`, re-run `03_enrich.py extract`; same with `--kind segment_check` then `07_check.py` |
-| Real email verification | **the agent via connector** | `05_verify.py todo v.json`, call `verify_email` per address (0.25 credit each), write results `[{email, verification_status, catch_all}]`, `05_verify.py ingest results.json` |
 | Load | scripts + **connector** | `08_load.py --segment S --tier A --size N --copy-version vX --campaign-id ID` (dry run) -> `add_leads_to_campaign_or_list_bulk` with `data/loads/<batch>.leads.json` -> `08_load.py ... --record` |
 | Sync from Instantly | **connector** + script | `list_emails` (campaign_id, email_type sent / received, limit 100, follow `next_starting_after`) and `list_leads` (campaign, filter FILTER_VAL_BOUNCED / FILTER_VAL_UNSUBSCRIBED) pages are saved to files; `09_sync.py emails|leads <files>` |
 | Replies | script + **connector** | `10_reply.py` writes `reports/replies_to_send.json`; send each with `reply_to_email`; then `10_reply.py mark-sent <reply ids>` |
 | Daily | all | owner's upload -> `python run.py daily <upload.csv>` (statuses, reply, match, suppress, report, save), then write the scorecard and review queue into the Control sheet |
 | Tests | script | `python -m unittest discover -s tests` (must pass before changing pipeline code) |
 
-Order note: scoring runs BEFORE verification (04 then 05) so only Tier A/B addresses spend verification credits.
+Order note: scoring runs BEFORE the MX check (04 then 05) so only Tier A/B addresses are checked.
 Every step is safe to re-run; every job writes a row to `runs`.
 
-## Verification reality (read before loading)
+## Verification (owner decision 2026-11-11)
 
-Outbound port 25 is blocked, so there is no free SMTP check. Instantly verification costs 0.25 credit per address and the
-workspace had ~2.75 credits left on 2026-11-11. `verify.min_level` in `config/sources.yaml` is `valid` (strict, only
-Instantly-verified addresses load). `mx_only` accepts the free DNS-over-HTTPS check but risks bounces: that is the
-owner's decision, never the agent's.
+No Instantly verification: the owner accepts some bounces that cannot be prevented. `verify.min_level` is `mx_only`: the
+free DNS-over-HTTPS check (`05_verify.py mx`, run by `run.py research`) confirms only that the domain can receive mail.
+Outbound port 25 is blocked, so there is no SMTP check. Instantly's `verify_email` is NOT used (it costs credits).
+Bounce protection in Instantly stays on; bounces are synced, suppressed, and reported in the scorecard.
 
 ## Record flow
 
