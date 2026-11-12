@@ -80,6 +80,8 @@ def from_gosom(path: Path):
                 "phone": lib.norm_phone(r.get("phone")), "city": lib.norm_city(city),
                 "address": addr, "postal_code": lib.first_postal_v(addr) or "",
                 "category": r.get("category") or "", "reviews": r.get("review_count") or "",
+                "segment_hint": (r.get("input_id") or "").split("|")[0] if "|" in (r.get("input_id") or "") else "",
+                "query_id": r.get("input_id") or "",
             }))
     return out
 

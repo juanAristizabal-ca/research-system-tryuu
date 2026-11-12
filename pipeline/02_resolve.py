@@ -53,8 +53,9 @@ def main():
             bid = resolve_row(conn, row["id"], n, row["source"])
             conn.execute("UPDATE raw_rows SET business_id=? WHERE id=?", (bid, row["id"]))
             hint = n.get("segment_hint")
-            if hint:
-                conn.execute("UPDATE businesses SET segment=COALESCE(segment, ?) WHERE id=?", (hint, bid))
+            if hint:  # only a hint: the segment is set by extraction, from a quote on the site
+                conn.execute("INSERT OR IGNORE INTO evidence(business_id, field, value, quote) VALUES (?,?,?,?)",
+                             (bid, "category_hint", hint, "discovery query"))
         conn.commit()
         created = conn.execute("SELECT COUNT(*) FROM businesses").fetchone()[0] - before
         r.n_out = created

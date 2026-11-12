@@ -157,3 +157,12 @@ CREATE TABLE IF NOT EXISTS llm_tasks (
 );
 
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT, updated TEXT NOT NULL DEFAULT (datetime('now')));
+
+-- Every discovery query that was run, so another session knows what has already been searched.
+CREATE TABLE IF NOT EXISTS search_log (
+  id INTEGER PRIMARY KEY,
+  category TEXT NOT NULL, source TEXT NOT NULL, query TEXT NOT NULL, city TEXT,
+  ran_at TEXT NOT NULL DEFAULT (datetime('now')),
+  rows_read INTEGER, rows_new INTEGER,
+  UNIQUE (category, source, query, city)
+);

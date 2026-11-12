@@ -1,7 +1,7 @@
 # Which sources run and their limits. Everything here is free.
 llm:
   model: claude-haiku-5-5          # extraction + second-pass check
-  max_chars_per_business: 14000
+  max_chars_per_business: 3500
 crawl:
   user_agent: "TryuuResearchBot/1.0"
   delay_seconds: 1.0               # per host

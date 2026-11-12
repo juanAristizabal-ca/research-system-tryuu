@@ -148,6 +148,7 @@ def cmd_crawl(conn, a):
     cfg = src["crawl"]
     bad = tuple(src["offlimits"])
     q = ("SELECT id, website, domain FROM businesses WHERE website IS NOT NULL AND status IN ('discovered','enriched')"
+         + (f" AND origin='{a.origin}'" if a.origin else "")
          + ("" if a.recrawl else " AND id NOT IN (SELECT business_id FROM pages)") + " ORDER BY id")
     rows = [r for r in conn.execute(q).fetchall() if not r["domain"].endswith(bad)]
     if a.limit:
@@ -171,21 +172,40 @@ def cmd_crawl(conn, a):
 
 
 # ------------------------------------------------------------------ extract
+OWNER_RE = re.compile(r"\b(owner|founder|co-founder|director|principal|instructor|teacher|coach|chef|practitioner|therapist|counsellor|"
+                      r"counselor|registered|led by|meet |my name is|i am|i'm|about (me|us))\b", re.I)
+FREE_RE = re.compile(r"\b(free|complimentary|no[- ]cost|no[- ]charge|trial|drop-?in|intro|first (class|lesson|visit|session)|consultation|assessment|tour|tasting)\b", re.I)
+
+
+def _sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\s{2,}| \| ", text) if 25 <= len(s.strip()) <= 320]
+
+
 def build_prompt(conn, bid: int, cap: int) -> str | None:
-    """Per-business body only; the fixed instructions are added once per worksheet (llm.py)."""
+    """Per-business body only (instructions are added once per worksheet by llm.py). Snippet mode: the agent sees the
+    page titles, the sentences that mention an offer, the sentences that name an owner/teacher, and address text,
+    instead of whole pages. Every quote the agent returns is still verified against the full stored text by code."""
     pages = conn.execute("SELECT url, text FROM pages WHERE business_id=? AND text IS NOT NULL ORDER BY id", (bid,)).fetchall()
     if not pages:
         return None
     texts = lib.dedupe_pages([p["text"] for p in pages])
-    body, used = [], 0
+    biz = conn.execute("SELECT name, city FROM businesses WHERE id=?", (bid,)).fetchone()
+    out, used, seen = [f"Business: {biz['name']} ({biz['city'] or 'unknown city'})"], 0, set()
     for p, t in zip(pages, texts):
-        chunk = f"[[URL: {p['url']}]]\n{t}"
-        body.append(chunk[: max(0, cap - used)])
+        sents = _sentences(t)
+        pick = [t[:260]] + [s for s in sents if FREE_RE.search(s)][:4] + [s for s in sents if OWNER_RE.search(s)][:3]
+        pick = [s for s in dict.fromkeys(pick) if s and s not in seen]
+        seen.update(pick)
+        if not pick:
+            continue
+        chunk = f"[[URL: {p['url']}]]\n" + "\n".join(f"- {s}" for s in pick)
+        if used + len(chunk) > cap:
+            chunk = chunk[: max(0, cap - used)]
+        out.append(chunk)
         used += len(chunk)
         if used >= cap:
             break
-    biz = conn.execute("SELECT name, city FROM businesses WHERE id=?", (bid,)).fetchone()
-    return f"Business: {biz['name']} ({biz['city'] or 'unknown city'})\n" + "\n".join(body)
+    return "\n".join(out)
 
 
 def skip_reason(conn, b, seed: dict, cities: set) -> str | None:
@@ -261,7 +281,8 @@ def cmd_extract(conn, a):
         todo = conn.execute(
             "SELECT * FROM businesses WHERE status='discovered' AND id IN (SELECT business_id FROM pages WHERE text IS NOT NULL) "
             "AND id NOT IN (SELECT business_id FROM llm_tasks WHERE kind='extract') "
-            "AND id NOT IN (SELECT business_id FROM evidence WHERE field='skip_reason') ORDER BY id"
+            "AND id NOT IN (SELECT business_id FROM evidence WHERE field='skip_reason')"
+            + (f" AND origin='{a.origin}'" if a.origin else "") + " ORDER BY id"
             + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
         r.n_in = len(todo)
         skipped = queued = 0
@@ -296,6 +317,7 @@ def main():
     ap.add_argument("cmd", choices=["crawl", "extract"])
     ap.add_argument("--limit", type=int)
     ap.add_argument("--recrawl", action="store_true")
+    ap.add_argument("--origin", help="only businesses found by this source (e.g. gosom = this research session)")
     a = ap.parse_args()
     conn = lib.connect()
     {"crawl": cmd_crawl, "extract": cmd_extract}[a.cmd](conn, a)

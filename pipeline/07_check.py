@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
 
-STOP = {"and", "the", "of", "in", "at", "for", "club", "studio", "studios", "academy", "centre", "center"}
+STOP = {"and", "the", "of", "in", "at", "for", "club", "studio", "studios", "academy", "centre", "center", "productions", "services", "group", "company", "society", "school", "inc", "ltd"}
 
 
 def name_on_site(name: str, text: str) -> bool:
@@ -34,7 +34,7 @@ def _crawler():
 
 
 def segment_prompt(conn, bid: int, segs: list[str]) -> str:
-    text = " ".join(r["text"] or "" for r in conn.execute("SELECT text FROM pages WHERE business_id=? ORDER BY id", (bid,)))[:6000]
+    text = " ".join(r["text"] or "" for r in conn.execute("SELECT text FROM pages WHERE business_id=? ORDER BY id", (bid,)))[:1500]
     return text
 
 

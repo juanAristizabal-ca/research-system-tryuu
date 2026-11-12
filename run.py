@@ -81,6 +81,7 @@ def git(*a):
 def save(msg: str):
     """backup + commit + push. Data (dump, reports, raw, loads) is only committed when git.private_confirmed is true,
     because the dump holds business emails and reply text."""
+    subprocess.call([sys.executable, str(ROOT / "pipeline" / "category_report.py")], stdout=subprocess.DEVNULL)  # refreshes CATEGORY_STATE.md
     backup()
     private = bool(lib.load_yaml("sources.yaml").get("git", {}).get("private_confirmed"))
     git("add", "-A", "--", ".")
