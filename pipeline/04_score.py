@@ -33,7 +33,10 @@ def compute(conn, b, cfg: dict, segs: dict, cities: set) -> tuple[int, dict]:
 
 
 def tier_for(score: int, tiers: dict) -> str:
-    return "A" if score >= tiers["A"] else "B" if score >= tiers["B"] else "X"
+    for t in sorted(tiers, key=lambda k: -tiers[k]):  # A, B, C, D by cut-off, highest first
+        if score >= tiers[t]:
+            return t
+    return "X"
 
 
 def main():
@@ -43,7 +46,7 @@ def main():
     with lib.run(conn, "04_score") as r:
         rows = conn.execute("SELECT * FROM businesses WHERE status IN ('enriched','scored','verified')").fetchall()
         r.n_in = len(rows)
-        counts = {"A": 0, "B": 0, "X": 0}
+        counts = {"A": 0, "B": 0, "C": 0, "D": 0, "X": 0}
         for b in rows:
             score, sig = compute(conn, b, cfg, segs, cities)
             tier = tier_for(score, cfg["tiers"])
@@ -54,7 +57,7 @@ def main():
             counts[tier] += 1
             r.n_out += 1
         conn.commit()
-        print(f"scoring {ver}: Tier A={counts['A']}  Tier B={counts['B']}  not contacted={counts['X']}")
+        print(f"scoring {ver}: Tier A={counts['A']}  B={counts['B']}  C={counts['C']}  D={counts['D']}  not contacted={counts['X']}")
 
 
 if __name__ == "__main__":

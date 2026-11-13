@@ -78,7 +78,7 @@ def precision(conn, segment, tier) -> tuple[float, int]:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--segment", required=True); ap.add_argument("--tier", required=True, choices=["A", "B"])
+    ap.add_argument("--segment", required=True); ap.add_argument("--tier", required=True, choices=["A", "B", "C", "D"])
     ap.add_argument("--size", type=int, required=True); ap.add_argument("--copy-version", required=True)
     ap.add_argument("--campaign-id"); ap.add_argument("--record", action="store_true")
     ap.add_argument("--force", action="store_true", help="ignore the precision gate (document why in the change log)")

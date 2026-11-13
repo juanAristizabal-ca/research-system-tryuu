@@ -78,7 +78,7 @@ class Pure(unittest.TestCase):
     def test_tiers(self):
         s = load("04_score.py")
         t = lib.load_yaml("scoring.yaml")["tiers"]
-        self.assertEqual([s.tier_for(x, t) for x in (95, 70, 69, 45, 44)], ["A", "A", "B", "B", "X"])
+        self.assertEqual([s.tier_for(x, t) for x in (95, 70, 69, 45, 44, 30, 29, 15, 14)], ["A", "A", "B", "B", "C", "C", "D", "D", "X"])
 
 
 class Flow(unittest.TestCase):

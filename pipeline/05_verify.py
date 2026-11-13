@@ -26,7 +26,7 @@ def settle(conn) -> tuple[int, int]:
     need = 1 if lib.load_yaml("sources.yaml")["verify"]["min_level"] == "mx_only" else 3
     up = down = 0
     rows = conn.execute("SELECT c.verification v, b.id bid, b.status, s.tier FROM contacts c JOIN businesses b ON b.id=c.business_id "
-                        "JOIN scores s ON s.business_id=b.id WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','verified','enriched')").fetchall()
+                        "JOIN scores s ON s.business_id=b.id WHERE c.is_chosen=1 AND s.tier IN ('A','B','C','D') AND b.status IN ('scored','verified','enriched')").fetchall()
     for r in rows:
         ok = LEVELS.get(r["v"], 0) >= need
         if ok and r["status"] != "verified":
@@ -44,7 +44,7 @@ def settle(conn) -> tuple[int, int]:
 def cmd_mx(conn, a):
     with lib.run(conn, "05_verify:mx") as r:
         rows = conn.execute("SELECT c.id cid, c.email FROM contacts c JOIN businesses b ON b.id=c.business_id JOIN scores s ON s.business_id=b.id "
-                            "WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','enriched') AND c.verification IS NULL"
+                            "WHERE c.is_chosen=1 AND s.tier IN ('A','B','C','D') AND b.status IN ('scored','enriched') AND c.verification IS NULL"
                             + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
         r.n_in = len(rows)
         for row in rows:
@@ -59,7 +59,7 @@ def cmd_mx(conn, a):
 
 def cmd_todo(conn, a):
     rows = conn.execute("SELECT c.email, b.name, s.tier, s.score FROM contacts c JOIN businesses b ON b.id=c.business_id JOIN scores s ON s.business_id=b.id "
-                        "WHERE c.is_chosen=1 AND s.tier IN ('A','B') AND b.status IN ('scored','verified') "
+                        "WHERE c.is_chosen=1 AND s.tier IN ('A','B','C','D') AND b.status IN ('scored','verified') "
                         "AND (c.verification IS NULL OR c.verification='mx_only') ORDER BY s.tier, s.score DESC"
                         + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
     Path(a.file).write_text(json.dumps([{"email": r["email"], "name": r["name"], "tier": r["tier"]} for r in rows], indent=1))

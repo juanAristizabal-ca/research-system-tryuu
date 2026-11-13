@@ -92,7 +92,7 @@ def write_state(conn, rows, cats, groups):
             continue
         any_row = True
         lg = log[slug]
-        L.append(f"| {slug} | {s['found']} | {s['enriched']} | {s['scored']} | {s['verified']} | **{s['ready_to_load']}** (A {s['ready_A']}, B {s['ready_B']}) | {s['loaded'] + s['sent'] + s['replied']} | {lg['n']} |")
+        L.append(f"| {slug} | {s['found']} | {s['enriched']} | {s['scored']} | {s['verified']} | **{s['ready_to_load']}** (A {s['ready_A']}, B {s['ready_B']}, C {s['ready_C']}, D {s['ready_D']}) | {s['loaded'] + s['sent'] + s['replied']} | {lg['n']} |")
     if not any_row:
         L.append("| (none yet) | | | | | | | |")
     L += ["", "## Contactable from the legacy pool (never emailed, discovered before this system)", "", "| Category | Never contacted | Known | Emailed |", "|---|---|---|---|"]

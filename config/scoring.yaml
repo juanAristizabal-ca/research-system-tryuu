@@ -1,5 +1,5 @@
 # Starting weights (a guess). Corrected from results via the feedback rules in 12_report.
-tiers: {A: 70, B: 45}     # score >= A -> Tier A; >= B -> Tier B; else X (not contacted)
+tiers: {A: 70, B: 45, C: 30, D: 15}   # highest tier whose cut-off the score reaches; below D = X (not contacted). Loads default to A/B: C and D only on an explicit --tier
 signals:
   proven_segment: 25
   free_offer_with_quote: 20
