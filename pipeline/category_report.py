@@ -79,7 +79,7 @@ def write_state(conn, rows, cats, groups):
          "1. `git pull`, `python run.py restore` (if `data/tryuu.db` is missing), `python run.py status`.",
          "2. Pick a category from **Contactable now** or **Not searched yet**. Never re-run a query already listed in **Searches run**:",
          "   `discover_batch.py` skips them by itself (`search_log` table).",
-         "3. Discover: `python pipeline/discover_batch.py <category>` (Docker must be up: `setsid nohup dockerd`).",
+         "3. Discover: `python pipeline/discover_batch.py <category>` (Docker must be up: `setsid nohup dockerd`). Standing rule: it searches every city AND every neighbourhood of the 15 launch cities (265 areas, see CLAUDE.md); a category is only 'consumed' when both passes are logged.",
          "4. `python run.py research`; answer the extraction worksheet (`llm.py export ... --kind extract`, `llm.py import`), re-run it; same for `segment_check`.",
          "5. Ready leads = status `verified` with a passed check. Loading needs the owner's approved copy and campaign id (see CLAUDE.md). Never activate campaigns.",
          "6. `python pipeline/category_report.py` then `python run.py save \"...\"` so this file stays current.", "",

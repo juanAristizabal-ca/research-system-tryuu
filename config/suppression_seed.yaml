@@ -1,7 +1,7 @@
 # Permanent, human-set suppressions loaded by 07_suppress on every run.
 name_patterns:           # case-insensitive substrings of business name
   - cypress              # owner rule: never include anything named Cypress
-reject_mailbox_prefixes: [jobs, careers, career, hr, privacy, noreply, no-reply, donotreply, webmaster, support, customerservice, customer-service, care, concierge, booking, bookings, catering, abuse, postmaster, press, media, legal, billing, accounts, invoices]
-generic_mailbox_prefixes: [info, hello, hi, contact, admin, office, team, mail, enquiries, inquiries, sales, studio, reception, frontdesk, general, enquiry, connect, welcome, admissions, enrol, enroll, enrolment, registration, service, services, orders, order, gym, class, classes, lessons, appointments, appointment, marketing, manager, owner, studio, clinic, therapy, wellness, reach, social, rec, bc, van, northvan]
+reject_mailbox_prefixes: [jobs, careers, career, hr, privacy, noreply, no-reply, donotreply, webmaster, abuse, postmaster, press, media, legal, billing, accounts, invoices]
+generic_mailbox_prefixes: [support, customerservice, customer-service, care, concierge, booking, bookings, catering, info, hello, hi, contact, admin, office, team, mail, enquiries, inquiries, sales, studio, reception, frontdesk, general, enquiry, connect, welcome, admissions, enrol, enroll, enrolment, registration, service, services, orders, order, gym, class, classes, lessons, appointments, appointment, marketing, manager, owner, studio, clinic, therapy, wellness, reach, social, rec, bc, van, northvan]
 cooldown_days: 60        # no re-contact within this window
 not_interested_days: 180

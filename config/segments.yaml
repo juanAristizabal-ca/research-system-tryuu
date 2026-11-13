@@ -23,16 +23,20 @@ city_aliases:
   "Hastings-Sunrise": Vancouver
 
 # Second-pass search areas for dense cities (Maps caps results per query, so big cities are searched by neighbourhood).
-neighbourhoods:
-  Vancouver: [Kitsilano, Mount Pleasant, Yaletown, Gastown, Downtown, West End, Kerrisdale, Dunbar, Point Grey, Commercial Drive, Hastings-Sunrise, Fairview, Marpole, Oakridge, Kensington-Cedar Cottage, Renfrew-Collingwood, Killarney, Riley Park, Strathcona, South Granville, Shaughnessy, Arbutus Ridge, Sunset, Victoria-Fraserview, West Point Grey]
-  Burnaby: [Metrotown, Brentwood, Lougheed, Edmonds, Burnaby Heights, Highgate, Capitol Hill, Deer Lake, Willingdon Heights, Kingsway]
-  Surrey: [Fleetwood, Newton, Guildford, Cloverdale, South Surrey, Whalley, City Centre, Fraser Heights, Panorama Ridge, Clayton]
-  Richmond: [City Centre, Steveston, Bridgeport, Broadmoor, Hamilton, Ironwood, Cambie, Thompson]
-  Coquitlam: [Burquitlam, Maillardville, Westwood Plateau, Coquitlam Centre, Burke Mountain, Austin Heights]
-  North Vancouver: [Lonsdale, Lynn Valley, Edgemont, Capilano, Deep Cove, Seymour, Pemberton]
-  Langley: [Willowbrook, Walnut Grove, Murrayville, Fort Langley, Aldergrove, Brookswood]
-  Delta: [Ladner, Tsawwassen, North Delta, Sunshine Hills]
-  Maple Ridge: [Haney, Albion, Whonnock]
-  New Westminster: [Uptown, Queensborough, Sapperton, Downtown New Westminster]
-  Port Coquitlam: [Citadel, Downtown Port Coquitlam]
-  West Vancouver: [Ambleside, Dundarave, Horseshoe Bay, Caulfeild]
+neighbourhoods:   # RULE: every research session searches each of these (plus the whole city). Keep ALL launch cities covered.
+  Vancouver: [Kitsilano, Mount Pleasant, Yaletown, Gastown, Downtown, West End, Kerrisdale, Dunbar, Point Grey, Commercial Drive, Hastings-Sunrise, Fairview, Marpole, Oakridge, Kensington-Cedar Cottage, Renfrew-Collingwood, Killarney, Riley Park, Strathcona, South Granville, Shaughnessy, Arbutus Ridge, Sunset, Victoria-Fraserview, West Point Grey, Chinatown, Olympic Village, Cambie Village, Main Street, Grandview-Woodland, Champlain Heights, Granville Island, Coal Harbour, UBC, Joyce-Collingwood, Langara, Cedar Cottage, Fraserhood, Knight Street, South Cambie, Hastings]
+  Burnaby: [Metrotown, Brentwood, Lougheed, Edmonds, Burnaby Heights, Highgate, Capitol Hill, Deer Lake, Willingdon Heights, Kingsway, Big Bend, Burnaby Lake, Cariboo, Sperling, Lake City, Simon Fraser University, Garden Village, Suncrest, Forest Glen, South Slope, Maywood, Edmonds Town Centre, Royal Oak, Bonsor]
+  Surrey: [Fleetwood, Newton, Guildford, Cloverdale, South Surrey, Whalley, City Centre, Fraser Heights, Panorama Ridge, Clayton, Semiahmoo, Sullivan Heights, Bear Creek, Port Kells, Campbell Heights, Crescent Beach, Bridgeview, East Clayton, Grandview Heights, King George, Queen Mary Park, Serpentine, Surrey Central, Newton Town Centre, Cloverdale Town Centre]
+  Richmond: [City Centre, Steveston, Bridgeport, Broadmoor, Hamilton, Ironwood, Cambie, Thompson, Blundell, Steveston Village, Terra Nova, East Cambie, Seafair, West Cambie, Garden City, Shellmont, Sea Island, Richmond Centre, Aberdeen, Lansdowne, Brighouse, Westwind, Gilmore]
+  Coquitlam: [Burquitlam, Maillardville, Westwood Plateau, Coquitlam Centre, Burke Mountain, Austin Heights, Eagle Ridge, Ranch Park, Town Centre, River Springs, Harbour Chines, Partington Creek, Riverview, Cape Horn, Scott Creek, Southwest Coquitlam, Coquitlam West, Oxford Heights]
+  North Vancouver: [Lonsdale, Lynn Valley, Edgemont, Capilano, Deep Cove, Seymour, Pemberton, Lower Lonsdale, Upper Lonsdale, Blueridge, Dollarton, Norgate, Westlynn, Delbrook, Queensbury, Central Lonsdale, Marine Drive, Moodyville, Grand Boulevard, Mosquito Creek, Lynnmour, Maplewood]
+  Langley: [Willowbrook, Walnut Grove, Murrayville, Fort Langley, Aldergrove, Brookswood, Langley City, Willoughby, Milner, Salmon River, Yorkson, Fernridge, Glen Valley, Livingstone, Langley Meadows, Downtown Langley, Brookswood-Fernridge]
+  Delta: [Ladner, Tsawwassen, North Delta, Sunshine Hills, Boundary Bay, Annieville, Scottsdale, Tilbury, Delta Nordel, Ladner Village, Tsawwassen Beach, English Bluff, Tsawwassen Heights, Westham Island, Delta Pioneers]
+  Maple Ridge: [Haney, Albion, Whonnock, Websters Corners, Hammond, Cottonwood, Silver Valley, Yennadon, Thornhill, Kanaka Creek, Ruskin, Downtown Maple Ridge, Maple Ridge Town Centre]
+  New Westminster: [Uptown, Queensborough, Sapperton, Downtown New Westminster, Brow of the Hill, Glenbrook North, Victoria Hill, Connaught Heights, Moody Park, West End New Westminster, Quayside, Massey Victory Heights, Lower Twelfth]
+  Port Coquitlam: [Citadel, Downtown Port Coquitlam, Oxford Heights, Glenwood, Riverwood, Lincoln Park, Birchland Manor, Mary Hill, Citadel Heights, Leigh Square, Hyde Creek, Dominion Triangle]
+  West Vancouver: [Ambleside, Dundarave, Horseshoe Bay, Caulfeild, British Properties, Cedardale, Altamont, Chartwell, Sentinel Hill, Park Royal, Gleneagles, Eagle Harbour, Whytecliff, Sandy Cove, Westmount]
+  Port Moody: [Inlet Centre, Moody Centre, Newport Village, Heritage Mountain, College Park, Glenayre, Ioco, Barber Street, Klahanie, Suter Brook, Heritage Woods, Port Moody City Centre]
+  White Rock: [White Rock Town Centre, East Beach, West Beach, Marine Drive White Rock, Uptown White Rock, Hillside White Rock, Semiahmoo White Rock, Five Corners]
+  Pitt Meadows: [Meadow Gardens, Osprey Village, Pitt Meadows Business Park, South Bonson, Harris Road, Pitt Meadows Town Centre, Pitt Meadows Airport]
+area_keywords: 4       # neighbourhood queries use the first N keywords of each category (strongest first)
