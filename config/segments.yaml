@@ -21,3 +21,18 @@ city_aliases:
   "City of North Vancouver": North Vancouver
   "Mount Pleasant": Vancouver
   "Hastings-Sunrise": Vancouver
+
+# Second-pass search areas for dense cities (Maps caps results per query, so big cities are searched by neighbourhood).
+neighbourhoods:
+  Vancouver: [Kitsilano, Mount Pleasant, Yaletown, Gastown, Downtown, West End, Kerrisdale, Dunbar, Point Grey, Commercial Drive, Hastings-Sunrise, Fairview, Marpole, Oakridge, Kensington-Cedar Cottage, Renfrew-Collingwood, Killarney, Riley Park, Strathcona, South Granville, Shaughnessy, Arbutus Ridge, Sunset, Victoria-Fraserview, West Point Grey]
+  Burnaby: [Metrotown, Brentwood, Lougheed, Edmonds, Burnaby Heights, Highgate, Capitol Hill, Deer Lake, Willingdon Heights, Kingsway]
+  Surrey: [Fleetwood, Newton, Guildford, Cloverdale, South Surrey, Whalley, City Centre, Fraser Heights, Panorama Ridge, Clayton]
+  Richmond: [City Centre, Steveston, Bridgeport, Broadmoor, Hamilton, Ironwood, Cambie, Thompson]
+  Coquitlam: [Burquitlam, Maillardville, Westwood Plateau, Coquitlam Centre, Burke Mountain, Austin Heights]
+  North Vancouver: [Lonsdale, Lynn Valley, Edgemont, Capilano, Deep Cove, Seymour, Pemberton]
+  Langley: [Willowbrook, Walnut Grove, Murrayville, Fort Langley, Aldergrove, Brookswood]
+  Delta: [Ladner, Tsawwassen, North Delta, Sunshine Hills]
+  Maple Ridge: [Haney, Albion, Whonnock]
+  New Westminster: [Uptown, Queensborough, Sapperton, Downtown New Westminster]
+  Port Coquitlam: [Citadel, Downtown Port Coquitlam]
+  West Vancouver: [Ambleside, Dundarave, Horseshoe Bay, Caulfeild]

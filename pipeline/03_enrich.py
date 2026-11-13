@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lib  # noqa: E402
+import rules_extract  # noqa: E402
 
 
 # ------------------------------------------------------------------ crawl
@@ -55,7 +56,7 @@ def parse_page(html: str, base_url: str, booking_hosts: list[str]) -> dict:
     for t in soup(["script", "style", "noscript", "svg"]):
         t.decompose()
     text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
-    emails += lib.EMAIL_RE.findall(text) + lib.EMAIL_RE.findall(jsonld)
+    emails += lib.EMAIL_RE.findall(text) + lib.EMAIL_RE.findall(jsonld) + lib.deobfuscate_emails(text)
     return {"text": text, "jsonld": jsonld[:3000], "emails": list(dict.fromkeys(lib.norm_email(e) for e in emails)),
             "phones": phones, "booking": booking, "links": links}
 
@@ -213,7 +214,7 @@ def skip_reason(conn, b, seed: dict, cities: set) -> str | None:
     if b["city"] and b["city"].lower() not in cities:
         return "outside launch cities"
     cands = [r["email"] for r in conn.execute("SELECT email FROM contacts WHERE business_id=?", (b["id"],))]
-    email, _, _ = lib.choose_mailbox(cands, b["domain"] or "", seed)
+    email, _, _ = lib.choose_mailbox(cands, b["domain"] or "", seed, None, b["name"])
     return None if email else "no usable mailbox on site"
 
 
@@ -265,7 +266,7 @@ def apply_extraction(conn, bid: int, data: dict) -> dict:
 
     owner_first = ev.get("owner_first_name", (None,))[0]
     cands = [r["email"] for r in conn.execute("SELECT email FROM contacts WHERE business_id=?", (bid,))]
-    email, reason, is_person = lib.choose_mailbox(cands, biz["domain"] or "", seed, owner_first)
+    email, reason, is_person = lib.choose_mailbox(cands, biz["domain"] or "", seed, owner_first, biz["name"])
     conn.execute("UPDATE contacts SET is_chosen=0 WHERE business_id=?", (bid,))
     if email:
         conn.execute("UPDATE contacts SET is_chosen=1, choice_reason=?, is_person=?, person=? WHERE business_id=? AND email=?",
@@ -274,53 +275,139 @@ def apply_extraction(conn, bid: int, data: dict) -> dict:
     return {"fields": list(ev), "email": email}
 
 
+def _todo(conn, a):
+    return conn.execute(
+        "SELECT * FROM businesses WHERE status='discovered' AND id IN (SELECT business_id FROM pages WHERE text IS NOT NULL) "
+        "AND id NOT IN (SELECT business_id FROM llm_tasks WHERE kind='extract' AND status='pending') "
+        "AND id NOT IN (SELECT business_id FROM evidence WHERE field='skip_reason')"
+        + (f" AND origin='{a.origin}'" if a.origin else "") + " ORDER BY id" + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
+
+
 def cmd_extract(conn, a):
+    """Default = rules (deterministic, free). --mode llm queues the same businesses for the agent instead."""
     cap = lib.load_yaml("sources.yaml")["llm"]["max_chars_per_business"]
     seed, cities = lib.load_yaml("suppression_seed.yaml"), lib.city_set()
-    with lib.run(conn, "03_enrich:extract") as r:
-        todo = conn.execute(
-            "SELECT * FROM businesses WHERE status='discovered' AND id IN (SELECT business_id FROM pages WHERE text IS NOT NULL) "
-            "AND id NOT IN (SELECT business_id FROM llm_tasks WHERE kind='extract') "
-            "AND id NOT IN (SELECT business_id FROM evidence WHERE field='skip_reason')"
-            + (f" AND origin='{a.origin}'" if a.origin else "") + " ORDER BY id"
-            + (f" LIMIT {a.limit}" if a.limit else "")).fetchall()
+    with lib.run(conn, f"03_enrich:extract:{a.mode}") as r:
+        todo = _todo(conn, a)
         r.n_in = len(todo)
-        skipped = queued = 0
+        skipped = done = queued = 0
         for b in todo:
             why = skip_reason(conn, b, seed, cities)
             if why:
                 conn.execute("INSERT OR REPLACE INTO evidence(business_id, field, value) VALUES (?,?,?)", (b["id"], "skip_reason", why))
                 skipped += 1
-                continue
-            p = build_prompt(conn, b["id"], cap)
-            if p and lib.enqueue_llm(conn, "extract", b["id"], p):
-                queued += 1
+            elif a.mode == "rules":
+                apply_extraction(conn, b["id"], rules_extract.extract(conn, b["id"]))
+                done += 1
+            else:
+                p = build_prompt(conn, b["id"], cap)
+                if p and lib.enqueue_llm(conn, "extract", b["id"], p):
+                    queued += 1
         conn.commit()
-        # apply every finished, not-yet-applied answer
-        done = conn.execute("SELECT t.business_id FROM llm_tasks t JOIN businesses b ON b.id=t.business_id "
-                            "WHERE t.kind='extract' AND t.status='done' AND b.status='discovered'").fetchall()
-        for row in done:
+        for row in conn.execute("SELECT t.business_id FROM llm_tasks t JOIN businesses b ON b.id=t.business_id "
+                                "WHERE t.kind='extract' AND t.status='done' AND b.status='discovered'").fetchall():
             data = lib.get_llm_response(conn, "extract", row["business_id"])
             if data is None:
                 r.errors.append(f"business {row['business_id']}: unparseable answer")
                 continue
             apply_extraction(conn, row["business_id"], data)
-            r.n_out += 1
+            done += 1
         conn.commit()
-        pend = conn.execute("SELECT COUNT(*) FROM llm_tasks WHERE kind='extract' AND status='pending'").fetchone()[0]
-        print(f"queued {queued}, skipped {skipped} (no mailbox / outside launch cities), applied {r.n_out}; {pend} pending for the agent "
-              f"(llm.py export <file> --kind extract, answer, llm.py import <answers>, re-run extract)")
+        r.n_out = done
+        print(f"mode {a.mode}: extracted {done}, queued for the agent {queued}, skipped {skipped} (no mailbox / outside launch cities)")
+
+
+EXTRA_PATHS = ["/contact", "/contact-us", "/contactus", "/contact.html", "/contact-us.html", "/about-us", "/about", "/get-in-touch", "/reach-us",
+               "/connect", "/enquiries", "/info", "/register", "/faq", "/about.html", "/studio"]
+
+
+def cmd_recover(conn, a):
+    """Second chance for sites where no email was found: (1) de-obfuscate emails in the stored page text, (2) try more contact paths."""
+    src = lib.load_yaml("sources.yaml")
+    crawler = Crawler(src["crawl"], src["booking_hosts"], src["crawl"]["page_keywords"])
+    with lib.run(conn, "03_enrich:recover") as r:
+        rows = conn.execute("SELECT b.id, b.website, b.domain FROM businesses b WHERE b.origin=? AND b.status='discovered' AND b.website IS NOT NULL "
+                            "AND NOT EXISTS (SELECT 1 FROM contacts k WHERE k.business_id=b.id) AND EXISTS (SELECT 1 FROM pages p WHERE p.business_id=b.id AND p.http_status=200)",
+                            (a.origin or "gosom",)).fetchall()
+        r.n_in = len(rows)
+        found = 0
+        for b in rows:  # (1) stored text, no network
+            texts = [p["text"] or "" for p in conn.execute("SELECT text FROM pages WHERE business_id=?", (b["id"],))]
+            for e in lib.deobfuscate_emails("\n".join(texts)):
+                conn.execute("INSERT OR IGNORE INTO contacts(business_id, email, source_url) VALUES (?,?,?)", (b["id"], e, "deobfuscated"))
+                found += 1
+        conn.commit()
+        todo = [b for b in rows if not conn.execute("SELECT 1 FROM contacts WHERE business_id=?", (b["id"],)).fetchone()]
+
+        haves = {b["id"]: {p["url"].rstrip("/") for p in conn.execute("SELECT url FROM pages WHERE business_id=?", (b["id"],))} for b in todo}
+
+        def one(b):   # worker thread: no database access here (sqlite connections are per-thread)
+            base = b["website"] if b["website"].startswith("http") else f"https://{b['domain']}"
+            rp = crawler.robots(base)
+            have = haves[b["id"]]
+            out = []
+            for path in EXTRA_PATHS:
+                u = urljoin(base, path)
+                if u.rstrip("/") in have:
+                    continue
+                code, h = crawler.get(u, rp)
+                if h:
+                    parsed = parse_page(h, u, src["booking_hosts"])
+                    out.append({"url": u, "kind": "recovery", "status": code, "parsed": parsed})
+                    if parsed["emails"]:
+                        break
+            return b["id"], out
+        with ThreadPoolExecutor(src["crawl"]["workers"]) as ex:
+            for bid, pages in ex.map(one, todo):
+                if pages:
+                    store_pages(conn, bid, pages)
+                conn.commit()
+        for b in rows:
+            if conn.execute("SELECT 1 FROM contacts WHERE business_id=?", (b["id"],)).fetchone():
+                conn.execute("DELETE FROM evidence WHERE business_id=? AND field='skip_reason'", (b["id"],))
+                r.n_out += 1
+        conn.commit()
+        print(f"recovered an email for {r.n_out} of {len(rows)} sites with none ({found} by de-obfuscation)")
+
+
+def cmd_audit(conn, a):
+    """Compare the rules extractor with the agent's answers (a JSONL worksheet answer file) on the same businesses. Nothing is written."""
+    tot = {"n": 0, "segment": 0, "offer_both": 0, "offer_agree": 0, "owner_both": 0, "owner_agree": 0, "rules_offer_only": 0, "rules_owner_only": 0}
+    for line in Path(a.file).read_text().splitlines():
+        if not line.strip():
+            continue
+        g = json.loads(line)
+        row = conn.execute("SELECT business_id FROM llm_tasks WHERE id=?", (g["id"],)).fetchone()
+        if not row:
+            continue
+        gold, mine = g["response"], rules_extract.extract(conn, row["business_id"])
+        tot["n"] += 1
+        tot["segment"] += (gold.get("segment") == mine["segment"])
+        go, mo = bool((gold.get("offer") or {}).get("sentence")), bool(mine["offer"]["sentence"])
+        tot["offer_agree"] += (go == mo)
+        tot["rules_offer_only"] += (mo and not go)
+        gw, mw = (gold.get("owner") or {}).get("first_name"), mine["owner"]["first_name"]
+        tot["owner_agree"] += ((gw or "").lower() == (mw or "").lower())
+        tot["rules_owner_only"] += (bool(mw) and not gw)
+        if gold.get("segment") != mine["segment"]:
+            print("  segment differs:", conn.execute("SELECT name FROM businesses WHERE id=?", (row["business_id"],)).fetchone()[0], "| agent:", gold.get("segment"), "| rules:", mine["segment"])
+    n = max(tot["n"], 1)
+    print(f"audit on {tot['n']} businesses: segment agree {tot['segment'] / n:.0%}, offer present/absent agree {tot['offer_agree'] / n:.0%} "
+          f"(rules found an offer the agent did not: {tot['rules_offer_only']}), owner first name agree {tot['owner_agree'] / n:.0%} "
+          f"(rules found an owner the agent did not: {tot['rules_owner_only']})")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["crawl", "extract"])
+    ap.add_argument("cmd", choices=["crawl", "extract", "audit", "recover"])
+    ap.add_argument("file", nargs="?")
+    ap.add_argument("--mode", choices=["rules", "llm"], default="rules")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--recrawl", action="store_true")
     ap.add_argument("--origin", help="only businesses found by this source (e.g. gosom = this research session)")
     a = ap.parse_args()
     conn = lib.connect()
-    {"crawl": cmd_crawl, "extract": cmd_extract}[a.cmd](conn, a)
+    {"crawl": cmd_crawl, "extract": cmd_extract, "audit": cmd_audit, "recover": cmd_recover}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

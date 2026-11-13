@@ -39,6 +39,16 @@ class Pure(unittest.TestCase):
         e, _, person = lib.choose_mailbox(["info@x.ca"], "x.ca", seed)
         self.assertEqual((e, person), ("info@x.ca", False))
 
+    def test_mailbox_fallbacks(self):
+        seed = lib.load_yaml("suppression_seed.yaml")
+        e, why, person = lib.choose_mailbox(["thrivedancestudio@gmail.com"], "thrive.ca", seed)
+        self.assertEqual((e, person), ("thrivedancestudio@gmail.com", False))   # generic free-mail on the site is usable, flagged
+        self.assertIn("flagged", why)
+        self.assertIsNone(lib.choose_mailbox(["contact@domain.com", "x%20y@gmail.com", "bob@wixpress.com"], "a.ca", seed)[0])  # junk
+        e, why, _ = lib.choose_mailbox(["dance@arthurmurray.ca"], "ajdance.ca", seed, None, "Arthur Murray Dance Studio")
+        self.assertEqual(e, "dance@arthurmurray.ca")                              # other domain, shares a word with the name
+        self.assertIsNone(lib.choose_mailbox(["agency@somedesigner.io"], "ajdance.ca", seed, None, "AJ Dance")[0])
+
     def test_normalisers(self):
         self.assertEqual(lib.norm_domain("https://www.Foo.ca/path"), "foo.ca")
         self.assertEqual(lib.norm_phone("+1 (604) 555-1212"), "6045551212")

@@ -21,22 +21,11 @@ DEEP, FRESH_MIN, UNEXPLORED_MAX = 300, 25, 20
 
 
 def compile_rules(cats: dict):
-    rules = []
-    for slug, c in cats.items():
-        pats = []
-        for t in c.get("types", []):
-            t = str(t).lower()
-            pats.append(re.compile(r"\b" + re.escape(t[1:]) + r"(s|es)?\b") if t.startswith("=") else re.compile(r"\b" + re.escape(t)))
-        rules.append((slug, pats))
-    return rules
+    return None  # kept for compatibility: patterns now live in lib.category_patterns()
 
 
-def classify(text: str, rules) -> str:
-    t = (text or "").lower()
-    for slug, pats in rules:
-        if any(p.search(t) for p in pats):
-            return slug
-    return "other_unclassified"
+def classify(text: str, rules=None) -> str:
+    return lib.classify_category(text)
 
 
 def suggest(known: int, emailed: int, fresh: int, campaigns: int, excluded: bool, proposed: bool = False, slug: str = "") -> str:
@@ -64,7 +53,7 @@ def pipeline_stages(conn, cats: dict) -> dict:
     ready = {r["business_id"] for r in conn.execute("SELECT business_id FROM checks WHERE passed=1")}
     tier = {r["business_id"]: r["tier"] for r in conn.execute("SELECT business_id, tier FROM scores")}
     for b in conn.execute("SELECT id, status, segment, origin FROM businesses WHERE origin='gosom'"):
-        slug = b["segment"] if b["segment"] in cats else hint.get(b["id"])
+        slug = hint.get(b["id"]) if hint.get(b["id"]) in cats else b["segment"]  # the category we SEARCHED for (a site can read as another segment)
         if slug not in cats:
             continue
         o = out[slug]
@@ -107,9 +96,9 @@ def write_state(conn, rows, cats, groups):
     if not any_row:
         L.append("| (none yet) | | | | | | | |")
     L += ["", "## Contactable from the legacy pool (never emailed, discovered before this system)", "", "| Category | Never contacted | Known | Emailed |", "|---|---|---|---|"]
-    for r in sorted(rows, key=lambda r: -r["fresh_never_contacted"]):
-        if r["fresh_never_contacted"] >= 5 and r["status"] not in ("not a target", "needs classification"):
-            L.append(f"| {r['category']} | {r['fresh_never_contacted']} | {r['known']} | {r['emailed']} |")
+    for r in sorted(rows, key=lambda r: -r["fresh_legacy"]):
+        if r["fresh_legacy"] >= 5 and r["status"] not in ("not a target", "needs classification"):
+            L.append(f"| {r['category']} | {r['fresh_legacy']} | {r['known']} | {r['emailed']} |")
     L += ["", "## Consumed (exhausted by our sweeps: fewer than 25 never contacted and 100+ emailed)", "",
           "Re-entry is possible 60 days after the last email (cooldown in `config/suppression_seed.yaml`), with the new sequence.", "",
           "| Category | Known | Emailed | Live | Legacy campaigns |", "|---|---|---|---|---|"]
@@ -142,7 +131,7 @@ def main():
     bounced = {r["business_id"] for r in conn.execute("SELECT DISTINCT business_id FROM sends WHERE bounced=1 AND business_id IS NOT NULL")}
     stat = collections.defaultdict(lambda: collections.Counter())
     unclassified = collections.Counter()
-    for b in conn.execute("SELECT id, status FROM businesses"):
+    for b in conn.execute("SELECT id, status, origin FROM businesses"):
         text = types.get(b["id"]) or seg.get(b["id"]) or ""
         slug = seg[b["id"]] if seg.get(b["id"]) in cats else classify(text, rules) if text else hints.get(b["id"], "other_unclassified")
         if slug not in cats:
@@ -152,6 +141,8 @@ def main():
         s = stat[slug]
         s["known"] += 1
         s[b["status"]] += 1
+        if b["origin"] != "gosom" and b["status"] in ("discovered", "enriched", "scored", "verified"):
+            s["fresh_legacy"] += 1
         if b["status"] in ("sent", "replied", "loaded", "onboarded"):
             s["emailed"] += 1
         if b["id"] in onboard_ids or b["status"] == "onboarded":
@@ -163,7 +154,7 @@ def main():
         s = stat.get(slug, collections.Counter())
         emailed, fresh = s["emailed"], s["discovered"] + s["enriched"] + s["scored"] + s["verified"]
         rows.append({
-            "category": slug, "group": c["group"], "known": s["known"], "emailed": emailed, "fresh_never_contacted": fresh,
+            "category": slug, "group": c["group"], "known": s["known"], "emailed": emailed, "fresh_never_contacted": fresh, "fresh_legacy": s["fresh_legacy"],
             "replied": s["replied"], "interested": s["interested"], "live": s["live"], "bounced": s["bounced"],
             "live_per_1000_emailed": round(1000 * s["live"] / emailed, 1) if emailed else "",
             "legacy_campaigns": " ".join(map(str, c.get("campaigns", []))), "proven": bool(c.get("proven")),

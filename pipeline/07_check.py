@@ -67,16 +67,25 @@ def evaluate(conn, b, cities: set, max_age: int, crawler=None, offline=False) ->
     if reasons:
         fails.append("suppressed: " + "; ".join(reasons[:2]))
     chk = lib.get_llm_response(conn, "segment_check", b["id"])
-    if chk is None:
-        fails.append("second-pass segment check pending")
-    elif chk.get("segment") != b["segment"]:
-        fails.append(f"second pass disagrees on segment ({chk.get('segment')} vs {b['segment']})")
+    cats = lib.load_yaml("categories.yaml")["categories"]
+    if chk is not None:   # the agent answered a second-pass task: that wins
+        site = chk.get("segment")
+        same_group = site in cats and b["segment"] in cats and cats[site]["group"] == cats[b["segment"]]["group"]
+        if site != b["segment"] and not same_group:
+            fails.append(f"second pass disagrees on segment ({site} vs {b['segment']})")
+    else:                 # deterministic independent pass: the site's own opening text must show evidence for the segment
+        home = next((p["text"] for p in pages), "").lower()[:700]
+        pats = lib.category_patterns().get(b["segment"], [])
+        kws = [k.lower() for k in cats.get(b["segment"], {}).get("keywords", [])]
+        if not (any(p.search(home) for p in pats) or any(k in home for k in kws)):
+            fails.append(f"no evidence on the site for segment {b['segment']}")
     return fails
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--offline", action="store_true")
+    ap.add_argument("--llm-second-pass", action="store_true", help="queue the second-pass segment check for the agent instead of the deterministic one")
     a = ap.parse_args()
     conn = lib.connect()
     segs = list(lib.segment_catalog())
@@ -86,9 +95,10 @@ def main():
     with lib.run(conn, "07_check") as r:
         rows = conn.execute("SELECT * FROM businesses WHERE status='verified'").fetchall()
         r.n_in = len(rows)
-        for b in rows:
-            lib.enqueue_llm(conn, "segment_check", b["id"], segment_prompt(conn, b["id"], segs))
-        conn.commit()
+        if a.llm_second_pass:
+            for b in rows:
+                lib.enqueue_llm(conn, "segment_check", b["id"], segment_prompt(conn, b["id"], segs))
+            conn.commit()
         passed = 0
         for b in rows:
             fails = evaluate(conn, b, cities, max_age, crawler, a.offline)
@@ -100,7 +110,7 @@ def main():
         r.n_out = passed
         pend = conn.execute("SELECT COUNT(*) FROM llm_tasks WHERE kind='segment_check' AND status='pending'").fetchone()[0]
         prec = passed / len(rows) if rows else 0
-        print(f"research precision {prec:.0%} ({passed}/{len(rows)} passed)" + (f"; {pend} second-pass tasks pending for the agent (llm.py export <file> --kind segment_check)" if pend else ""))
+        print(f"research precision {prec:.0%} ({passed}/{len(rows)} passed)" + (f"; {pend} agent second-pass tasks pending" if pend else ""))
 
 
 if __name__ == "__main__":

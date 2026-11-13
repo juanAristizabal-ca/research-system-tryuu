@@ -52,8 +52,10 @@ def parse_ts(s: str | None) -> dt.datetime | None:
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     p = Path(path or DB_PATH)
     p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(p, timeout=30)
+    conn = sqlite3.connect(p, timeout=120)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 120000")
+    conn.execute("PRAGMA journal_mode = WAL")   # concurrent scraper ingests and pipeline steps must not lock each other out
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript((ROOT / "db" / "schema.sql").read_text())
     return conn
@@ -105,6 +107,31 @@ def segment_catalog() -> dict:
     return {k: v for k, v in load_yaml("categories.yaml")["categories"].items() if not v.get("excluded")}
 
 
+_CAT_PATS: dict | None = None
+
+
+def category_patterns() -> dict:
+    """Compiled `types` tokens per category slug, in catalogue order (first match wins). '=tok' = whole word, plural allowed."""
+    global _CAT_PATS
+    if _CAT_PATS is None:
+        _CAT_PATS = {}
+        for slug, c in load_yaml("categories.yaml")["categories"].items():
+            _CAT_PATS[slug] = [re.compile(r"\b" + re.escape(str(t).lower()[1:]) + r"(s|es)?\b") if str(t).startswith("=")
+                               else re.compile(r"\b" + re.escape(str(t).lower())) for t in c.get("types", [])]
+    return _CAT_PATS
+
+
+def classify_category(text: str | None, skip_excluded: bool = True) -> str:
+    t = (text or "").lower()
+    cats = load_yaml("categories.yaml")["categories"]
+    for slug, pats in category_patterns().items():
+        if skip_excluded and cats[slug].get("excluded"):
+            continue
+        if any(p.search(t) for p in pats):
+            return slug
+    return "other_unclassified"
+
+
 def city_set() -> set[str]:
     return {c.lower() for c in load_yaml("segments.yaml")["launch_cities"]}
 
@@ -120,6 +147,23 @@ def norm_city(city: str | None) -> str:
 # ---------------------------------------------------------------- normalisers
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 POSTAL_RE = re.compile(r"\b([ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z])[ -]?(\d[ABCEGHJ-NPRSTV-Z]\d)\b", re.I)
+
+
+_OBF = re.compile(r"([A-Za-z0-9._%+\-]+)\s*(?:\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|\s+at\s+|@)\s*([A-Za-z0-9\-]+(?:\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+|\.)\s*[A-Za-z0-9\-]+)+)", re.I)
+
+
+def deobfuscate_emails(text: str) -> list[str]:
+    """'info [at] studio [dot] ca', 'info(at)studio.ca', 'info at studio dot ca' -> info@studio.ca (only when the TLD looks real)."""
+    out = []
+    for m in _OBF.finditer(text or ""):
+        user = m.group(1)
+        dom = re.sub(r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*", ".", m.group(2), flags=re.I)
+        dom = re.sub(r"\s+", "", dom).lower()
+        if re.search(r"\.(com|ca|net|org|info|biz|co|studio|dance|art|school|academy)$", dom) and "@" not in m.group(0).replace("(at)", "").replace("[at]", "") or "@" in m.group(0):
+            e = f"{user}@{dom}".lower()
+            if EMAIL_RE.fullmatch(e):
+                out.append(e)
+    return list(dict.fromkeys(out))
 
 
 def norm_email(e: str | None) -> str:
@@ -227,17 +271,31 @@ def mailbox_kind(email: str, seed: dict, owner_first: str | None = None) -> str:
     return "generic"
 
 
-def choose_mailbox(candidates: list[str], business_domain: str, seed: dict, owner_first: str | None = None):
-    """Plan 5.4 order: named person at business domain, named free-mail on site, then info@/hello@.
+JUNK_DOMAINS = {"example.com", "domain.com", "email.com", "yourdomain.com", "sentry.io", "wixpress.com", "wix.com", "godaddy.com",
+                "squarespace.com", "weebly.com", "wordpress.com", "shopify.com", "mailchimp.com", "sentry-next.wixpress.com", "w3.org", "schema.org"}
+
+
+def _clean_email(e: str) -> str | None:
+    e = norm_email(e)
+    if not EMAIL_RE.fullmatch(e) or "%" in e or len(e) > 70 or e.endswith((".png", ".jpg", ".gif", ".webp", ".svg", ".js", ".css")):
+        return None
+    return None if email_domain(e) in JUNK_DOMAINS else e
+
+
+def choose_mailbox(candidates: list[str], business_domain: str, seed: dict, owner_first: str | None = None, business_name: str | None = None):
+    """Public mailboxes found on the business's own site, best first (plan 5.4, widened after measuring that half of the
+    rejected leads had a perfectly good public address):
+      1 named person at the business domain   2 named person on free-mail   3 generic mailbox at the business domain
+      4 generic free-mail shown on the site (flagged, lower quality)   5 other-domain mailbox that shares a word with the business name.
     Returns (email, reason, is_person) or (None, 'no usable mailbox', False)."""
     cands = []
-    for e in dict.fromkeys(norm_email(c) for c in candidates):
-        if not EMAIL_RE.fullmatch(e):
+    for raw in dict.fromkeys(candidates):
+        e = _clean_email(raw)
+        if not e:
             continue
         kind = mailbox_kind(e, seed, owner_first)
-        if kind == "rejected":
-            continue
-        cands.append((e, kind, email_domain(e)))
+        if kind != "rejected":
+            cands.append((e, kind, email_domain(e)))
     for e, kind, d in cands:
         if kind == "person" and d == business_domain:
             return e, "named person at business domain", True
@@ -245,11 +303,15 @@ def choose_mailbox(candidates: list[str], business_domain: str, seed: dict, owne
         if kind == "person" and is_free_mail(d):
             return e, "named free-mail address shown on site", True
     for e, kind, d in cands:
-        if kind == "generic" and d == business_domain:
-            return e, "generic mailbox at business domain", False
-    for e, kind, d in cands:
         if d == business_domain:
-            return e, "mailbox at business domain", kind == "person"
+            return e, "mailbox at business domain", False
+    for e, kind, d in cands:
+        if is_free_mail(d):
+            return e, "free-mail address shown on site (flagged: could be personal)", False
+    words = {w for w in norm_name(business_name).split() if len(w) >= 4} if business_name else set()
+    for e, kind, d in cands:
+        if words and any(w in d.replace("-", "") or w in e.split("@")[0] for w in words):
+            return e, "other-domain mailbox related to the business name", False
     return None, "no usable mailbox", False
 
 
