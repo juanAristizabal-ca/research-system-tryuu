@@ -364,7 +364,9 @@ def suppression_reasons(conn, business_id: int, cooldown_days: int | None = None
                                   (kind, v, now_s)):
                 reasons.append(f"{kind} {v}: {s['reason']}")
     cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=cooldown)).strftime("%Y-%m-%d %H:%M:%S")
-    n = conn.execute("SELECT COUNT(*) FROM sends WHERE business_id=? AND sent_at > ?", (business_id, cutoff)).fetchone()[0]
+    exempt = re.compile(seed.get("cooldown_exempt_campaigns") or r"(?!)")
+    n = sum(1 for r in conn.execute("SELECT campaign_name FROM sends WHERE business_id=? AND sent_at > ?", (business_id, cutoff))
+            if not (r["campaign_name"] and exempt.search(r["campaign_name"])))
     if n:
         reasons.append(f"emailed within {cooldown} days")
     if conn.execute("SELECT 1 FROM onboarded WHERE business_id=?", (business_id,)).fetchone():

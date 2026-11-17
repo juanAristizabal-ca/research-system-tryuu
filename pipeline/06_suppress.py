@@ -5,6 +5,7 @@ Sources: live businesses (onboarded), bounces, stop / not-interested replies, ow
 Re-entry: a business whose last email was more than the cooldown ago, with no reply and no active
 suppression, goes back to 'enriched' so it is re-scored with the current config (plan 9.4)."""
 import datetime as dt
+import re
 import sys
 from pathlib import Path
 
@@ -55,6 +56,7 @@ def main():
         rows = conn.execute("SELECT id, status FROM businesses WHERE status NOT IN ('onboarded','closed')").fetchall()
         r.n_in = len(rows)
         cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=seed["cooldown_days"])).strftime("%Y-%m-%d %H:%M:%S")
+        exempt = re.compile(seed.get("cooldown_exempt_campaigns") or r"(?!)")
         blocked = reentered = 0
         for b in rows:
             reasons = lib.suppression_reasons(conn, b["id"])
@@ -65,9 +67,12 @@ def main():
             elif b["status"] == "suppressed":
                 lib.set_status(conn, b["id"], "enriched"); reentered += 1
             elif b["status"] in ("sent", "loaded"):
-                last = conn.execute("SELECT MAX(sent_at) m FROM sends WHERE business_id=?", (b["id"],)).fetchone()["m"]
+                sends = conn.execute("SELECT campaign_name, sent_at, bounced FROM sends WHERE business_id=?", (b["id"],)).fetchall()
+                counted = [x["sent_at"] for x in sends if not (x["campaign_name"] and exempt.search(x["campaign_name"])) and x["sent_at"]]
+                last = max(counted) if counted else ("0000" if sends else None)   # only exempt campaigns: eligible now
                 replied = conn.execute("SELECT 1 FROM replies WHERE business_id=? AND is_auto=0", (b["id"],)).fetchone()
-                if b["status"] == "sent" and last and last < cutoff and not replied:
+                interest = conn.execute("SELECT 1 FROM evidence WHERE business_id=? AND field='instantly_interest'", (b["id"],)).fetchone()
+                if b["status"] == "sent" and last and last < cutoff and not replied and not interest and not any(x["bounced"] for x in sends):
                     lib.set_status(conn, b["id"], "enriched"); reentered += 1
         conn.commit()
         r.n_out = blocked

@@ -151,7 +151,10 @@ def cmd_crawl(conn, a):
     q = ("SELECT id, website, domain FROM businesses WHERE website IS NOT NULL AND status IN ('discovered','enriched')"
          + (f" AND origin='{a.origin}'" if a.origin else "")
          + ("" if a.recrawl else " AND id NOT IN (SELECT business_id FROM pages)") + " ORDER BY id")
-    rows = [r for r in conn.execute(q).fetchall() if not r["domain"].endswith(bad)]
+    rows = [r for r in conn.execute(q).fetchall() if not (r["domain"] or "").endswith(bad)]
+    if a.ids_file:
+        keep = {int(x) for x in Path(a.ids_file).read_text().split()}
+        rows = [r for r in rows if r["id"] in keep]
     if a.limit:
         rows = rows[: a.limit]
     crawler = Crawler(cfg, src["booking_hosts"], cfg["page_keywords"])
@@ -404,6 +407,7 @@ def main():
     ap.add_argument("--mode", choices=["rules", "llm"], default="rules")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--recrawl", action="store_true")
+    ap.add_argument("--ids-file", help="crawl only the business ids listed in this file (one per line)")
     ap.add_argument("--origin", help="only businesses found by this source (e.g. gosom = this research session)")
     a = ap.parse_args()
     conn = lib.connect()

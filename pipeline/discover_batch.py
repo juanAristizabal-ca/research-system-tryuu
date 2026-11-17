@@ -120,7 +120,7 @@ def main():
     ap.add_argument("--areas", action="store_true", help="only the neighbourhood pass (the default already includes it)")
     ap.add_argument("--no-areas", action="store_true", help="whole cities only (quick probe, not a research session)")
     ap.add_argument("--max-keywords", type=int, default=99, help="cap for whole-city queries")
-    ap.add_argument("--chunk", type=int, default=120, help="queries per scraper container")
+    ap.add_argument("--chunk", type=int, default=40, help="queries per scraper container")
     ap.add_argument("--depth", type=int, default=15); ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--ingest", help="ingest an existing results CSV (its *_queries.txt sits next to it) instead of scraping")

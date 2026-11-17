@@ -13,7 +13,8 @@ Owner decisions (rebuild plan section 10.1) that are fixed:
 - Sender identity unchanged: the sending account's name, then the owner's phone number.
 - Launch cities: Greater Vancouver only (`launch_cities` in `config/segments.yaml`).
 - The live-business list is uploaded DAILY by the owner. Research starts ONLY when the owner says so.
-- Any live business may be the peer business in an email (`config/peers.yaml`).
+- Any live business may be the peer business in an email (`config/peers.yaml`). Listings whose signup email is a team placeholder
+  (`is_test_email`) are REAL businesses the team created for them: they are live, count as the best peers, and are never excluded.
 - Campaigns already active in Instantly (16 on 2026-11-12) are fine and their sending limits are safe (owner, 2026-11-12). Never pause or change them unless asked.
 
 ## Hard rules
@@ -34,6 +35,9 @@ Owner decisions (rebuild plan section 10.1) that are fixed:
   does both by default, in chunks of 120 queries, and logs each query in `search_log`). Neighbourhood queries use the
   first `area_keywords` (4) keywords of the category. Never run `--no-areas` for a real session. Keep every launch city
   covered when editing the list.
+- **Re-contact of campaigns B and earlier.** Businesses emailed only in campaigns before series C may be emailed again (owner, 2026-11-17):
+  `cooldown_exempt_campaigns` in `config/suppression_seed.yaml`; `pipeline/reenter_exempt.py` brings them back into the pipeline. Bounced,
+  replied, interest-flagged, onboarded and anything in series C or later stay blocked.
 - **No geography expansion.** `launch_cities` stays Greater Vancouver; widening needs a new owner decision.
 - **Mailboxes: a little more generic, never extreme.** Accepted: named people, info@/hello@/contact@/office@, plus
   support@, care@, booking(s)@, concierge@, catering@ at the business's own domain. Still rejected: jobs, careers, hr, privacy,
