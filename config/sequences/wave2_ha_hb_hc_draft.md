@@ -1,0 +1,49 @@
+---
+approved: false          # drafts for the owner; nothing is created, loaded or sent until approved
+version: wave2-draft-1
+---
+# Wave 2: three new angles, 50 businesses each. No links, same expert structure as wave 1 (reply "yes" -> link sent after).
+# Variables (verified data only): Business_Name, Business_Type, City, Peer_Line (same-type live Tryuu businesses),
+# Reg_Quote (verbatim registration/enrolment phrase from the business's own site), Local_Peer_Line (a live Tryuu business of the same type in the same city).
+
+## HA - registration open now
+Subject: New students at {{Business_Name}}
+
+Hi {{Business_Name}},
+
+I saw on your site: "{{Reg_Quote}}"
+
+While people are choosing right now, would you be open to offering a free 15-minute intro visit at your {{Business_Type}}? We'd love to have you share it on Tryuu. We help people discover local businesses by giving them a reason to show up in person. {{Peer_Line}}
+
+It's completely free, and it only takes a minute. If you're open to it, just reply "yes" and I'll send you the details.
+
+Follow-up day 3: Just following up on my note. With enrolment open, a free 15-minute intro visit is an easy way for new people to meet you. If you're open to it, reply "yes" and I'll send the details.
+Follow-up day 7: Last note from me. If you'd like more people in {{City}} to find {{Business_Name}} while you are enrolling, it costs nothing to be on Tryuu. Reply "yes" or "not now" and I'll leave it there.
+
+## HB - a local peer is already on Tryuu
+Subject: {{Business_Name}} on Tryuu?
+
+Hi {{Business_Name}},
+
+{{Local_Peer_Line}}
+
+Would you be open to offering a free 15-minute intro visit at your {{Business_Type}} too? We help people discover local businesses by giving them a reason to show up in person, and it's completely free and only takes a minute. If you're open to it, just reply "yes" and I'll send you the details.
+
+Follow-up day 3: Just following up on my note. We'd still love to feature a free 15-minute intro visit at {{Business_Name}} on Tryuu. Reply "yes" and I'll send the details.
+Follow-up day 7: Last note from me. If you'd like more people in {{City}} to walk through your door, it costs nothing to be on Tryuu. Reply "yes" or "not now" and I'll leave it there.
+
+## HC - written to the person who runs it (named-person mailbox)
+Subject: Quick question for whoever runs {{Business_Name}}
+
+Hi,
+
+I'm writing to the person who runs {{Business_Name}}. Would you be open to offering a free 15-minute intro visit at your {{Business_Type}}?
+
+We'd love to have you share it on Tryuu. We help people discover local businesses by giving them a reason to show up in person. {{Peer_Line}}
+
+It's completely free, and it only takes a minute. If you're open to it, just reply "yes" and I'll send you the details.
+
+Follow-up day 3: Just following up on my note. If a free 15-minute intro visit sounds good, reply "yes" and I'll send the details.
+Follow-up day 7: Last note from me. Reply "yes" or "not now" and I'll leave it there.
+
+Footer for all: Tryuu Platforms Inc. | Vancouver, BC. Not interested? Reply "unsubscribe" and we won't email you again.
