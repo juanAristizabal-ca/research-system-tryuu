@@ -1,7 +1,10 @@
 ---
-approved: false          # drafts for the owner; nothing is created, loaded or sent until approved
-version: wave2-draft-1
+approved: true           # owner approved 2026-11-18; campaigns exist as DRAFTS in Instantly (never activated by the agent)
+campaigns: {HA: 4ef79cea-84b7-495d-aa10-a278521c1cba, HB: 6fea5750-2b5e-4163-8276-55272f5b428e, HC: 312e9699-ab7d-4df4-9dfd-549382e43c11}
+settings: open tracking ON, link tracking OFF, first email has a 'Share it here' button ({{Signup_Link}}), follow-ups have none; senders zenbright.org x5; Tue-Thu 10-12 America/Boise = 9-11 Pacific
+version: wave2-final-1
 ---
+# Peer lines are chosen by category first, then distance (config: peers = the businesses live on Tryuu, geocoded), see pipeline notes.
 # Wave 2: three new angles, 50 businesses each. No links, same expert structure as wave 1 (reply "yes" -> link sent after).
 # Variables (verified data only): Business_Name, Business_Type, City, Peer_Line (same-type live Tryuu businesses),
 # Reg_Quote (verbatim registration/enrolment phrase from the business's own site), Local_Peer_Line (a live Tryuu business of the same type in the same city).
