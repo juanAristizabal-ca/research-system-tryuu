@@ -9,20 +9,22 @@ version: wave2-final-1
 # Variables (verified data only): Business_Name, Business_Type, City, Peer_Line (same-type live Tryuu businesses),
 # Reg_Quote (verbatim registration/enrolment phrase from the business's own site), Local_Peer_Line (a live Tryuu business of the same type in the same city).
 
-## HA - registration open now (rewritten 2026-11-18: the quote now leads into the offer)
-Subject: New {{Reg_Noun}} at {{Business_Name}}
+## HA - registration open now (simplified 2026-11-18: few variables, generic bridge)
+Variables used: Business_Name, Reg_Quote, Business_Type, Peer_Line, City, Signup_Link (first email button only).
+Subject: A quick idea for {{Business_Name}}
 
 Hi {{Business_Name}},
 
-{{Reg_Line}}                      (e.g. I saw on your site: "Register Now for 2026/2027!")
+I saw on your site: "{{Reg_Quote}}"
 
-{{Reg_Bridge}} That's why I'm writing: would you be open to offering a {{Free_Offer}} at your {{Business_Type}}? We'd love to have you share it on Tryuu, a local guide that helps people discover businesses by giving them a reason to show up in person. {{Peer_Line}}
+Since you're welcoming new people right now, would you be open to offering a free 15-minute intro visit at your {{Business_Type}}? Most people like to meet you and see the place before they commit.
+
+We'd love to have you share it on Tryuu. We help people discover local businesses by giving them a reason to show up in person. {{Peer_Line}}
 
 It's completely free, and it only takes a minute. If you're open to it, just reply "yes" or use the button below.   [Share it here]
 
-Per-row columns: Reg_Noun (students/clients/members), Reg_Line (quote, or a paraphrase for "spots left" widgets), Reg_Bridge (why a free first meeting makes sense: classes, limited spots, ready-to-start, counselling fit), Free_Offer (free 15-minute intro visit / intro call).
-Follow-up day 3: Just following up on my note. A {{Free_Offer}} gives the people who are deciding right now an easy way to meet you. If you're open to it, reply "yes" and I'll send the details.
-Follow-up day 7: Last note from me. If you'd like more people in {{City}} to find {{Business_Name}} while you are taking on new {{Reg_Noun}}, it costs nothing to be on Tryuu. Reply "yes" or "not now" and I'll leave it there.
+Follow-up day 3: Just following up on my note. A free 15-minute intro visit is an easy way for new people to meet you. If you're open to it, reply "yes" and I'll send the details.
+Follow-up day 7: Last note from me. If you'd like more people in {{City}} to find {{Business_Name}}, it costs nothing to be on Tryuu. Reply "yes" or "not now" and I'll leave it there.
 
 ## HB - a local peer is already on Tryuu
 Subject: {{Business_Name}} on Tryuu?
